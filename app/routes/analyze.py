@@ -1,13 +1,12 @@
 """
 /analyze route - HTTP layer for AI Symptom Analysis.
 
-This module deliberately contains NO business logic. Its only job is:
-  1. Receive and let FastAPI validate the request (via SymptomAnalysisRequest)
-  2. Call triage_service.analyze_symptoms()
-  3. Return the result
+Responsibilities:
+1. Validate incoming request.
+2. Forward request to the AI triage service.
+3. Return a structured triage response.
 
-All the interesting work (prompting, calling Gemini, parsing, fallback)
-lives in app/ai/. This keeps the route trivially easy to read and test.
+No business logic is implemented here.
 """
 
 import logging
@@ -15,35 +14,72 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from app.ai.triage_service import analyze_symptoms
-from app.models.symptom import SymptomAnalysisRequest, SymptomAnalysisResponse
+from app.models.symptom import (
+    SymptomAnalysisRequest,
+    SymptomAnalysisResponse,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Symptom Analysis"])
 
 
-@router.post("/analyze", response_model=SymptomAnalysisResponse)
-def analyze(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse:
-    """
-    Analyze reported symptoms and return an estimated urgency/triage result.
+@router.post(
+    "/analyze",
+    response_model=SymptomAnalysisResponse,
+    summary="Analyze User Symptoms",
+    description="""
+Analyze user-reported symptoms using the MediAssist AI triage engine.
 
-    NOTE: This endpoint does NOT diagnose any disease. It estimates
-    severity and recommends a next step only. See `disclaimer` in the
-    response, which is always present.
+The AI estimates the urgency of the reported symptoms and recommends the
+next appropriate medical action.
 
-    FastAPI validates the incoming JSON against SymptomAnalysisRequest
-    automatically - invalid input (e.g. negative age, blank symptoms)
-    is rejected with a 422 error before this function even runs.
+### Input
+- Age
+- Gender
+- Symptoms
+- Duration
+- Existing medical conditions (optional)
+
+### Output
+- Possible conditions
+- Severity (LOW, MODERATE, HIGH, EMERGENCY)
+- Recommended next step
+- SOS recommendation
+- Medical disclaimer
+
+⚠️ This endpoint **does not diagnose diseases** and should not be used as
+a replacement for professional medical advice.
+""",
+    response_description="Structured AI-generated triage assessment.",
+    responses={
+        200: {
+            "description": "Symptoms analyzed successfully.",
+        },
+        422: {
+            "description": "Validation error. Invalid or missing input fields.",
+        },
+        500: {
+            "description": "Unexpected internal server error.",
+        },
+    },
+)
+def analyze(
+    request: SymptomAnalysisRequest,
+) -> SymptomAnalysisResponse:
     """
+    Analyze symptoms and estimate medical urgency.
+
+    This endpoint performs AI-assisted symptom triage and returns a
+    structured assessment. It never attempts to diagnose diseases.
+    """
+
     try:
         return analyze_symptoms(request)
+
     except Exception as e:
-        # analyze_symptoms() already handles Gemini failures internally
-        # via the fallback (see app/ai/triage_service.py) - it should not
-        # raise under normal operation. This is a last-resort safety net
-        # for anything truly unexpected (e.g. a bug), so the API never
-        # returns a raw 500 with a stack trace to the frontend.
         logger.exception("Unexpected error in /analyze: %s", e)
+
         raise HTTPException(
             status_code=500,
             detail="An unexpected error occurred while analyzing symptoms. Please try again.",
