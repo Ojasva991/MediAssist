@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand palette */
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;
+  --color-primary-light: #DBEAFE;
+  --color-danger: #DC2626;
+  --color-danger-dark: #B91C1C;
+  --color-danger-light: #FEE2E2;
+  --color-success: #059669;
+  --color-success-light: #D1FAE5;
+  --color-warning: #D97706;
+  --color-warning-light: #FEF3C7;
+
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-ink: #0F172A;
+  --color-ink-soft: #475569;
+  --color-ink-faint: #94A3B8;
+  --color-border: #E2E8F0;
+
+  --font-display: "Lexend", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-card: 0.875rem;
+  --radius-control: 0.625rem;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -4px rgba(15, 23, 42, 0.08);
+  --shadow-card-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 28px -6px rgba(15, 23, 42, 0.12);
+  --shadow-pop: 0 8px 30px -6px rgba(37, 99, 235, 0.25);
+
+  --animate-pulse-line: pulse-line 2.4s linear infinite;
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pulse-line {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -240; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+/* Visible keyboard focus, healthcare-app accessible */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbar polish */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-faint); }
