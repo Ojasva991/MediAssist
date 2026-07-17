@@ -12,6 +12,7 @@ never raw AI output or JSON parsing.
 
 import json
 import logging
+import re
 
 from pydantic import ValidationError
 
@@ -26,6 +27,35 @@ DEFAULT_DISCLAIMER = (
     "This is not a medical diagnosis. If you are experiencing a medical "
     "emergency, contact local emergency services immediately."
 )
+
+# Defense-in-depth: the system prompt already instructs Gemini never to
+# state a specific emergency number (see app/ai/prompts.py rule 6), since
+# this app's actual SOS button dials India's number (112), not the
+# US-centric "911" that LLMs default to from training data. LLMs don't
+# always follow instructions perfectly, so this is a second, deterministic
+# layer that scrubs any such number out if it slips through anyway - a
+# wrong number in a medical emergency is not an acceptable failure mode.
+_WRONG_EMERGENCY_NUMBER_PATTERN = re.compile(
+    r"\b(?:call|dial|contact)\s+(?:the\s+)?(?:number\s+)?"
+    r"(911|999|000|111|119|110|999|112 or 911)\b",
+    re.IGNORECASE,
+)
+_GENERIC_REPLACEMENT = "contact your local emergency number"
+
+
+def _sanitize_emergency_number(text: str) -> str:
+    """Replace any AI-generated country-specific emergency number mention
+    with generic guidance, so it can never contradict the app's real SOS
+    number for the user's region. Preserves capitalization if the match
+    was at the start of a sentence."""
+
+    def _replace(match: re.Match) -> str:
+        replacement = _GENERIC_REPLACEMENT
+        if match.start() == 0 or text[match.start() - 2 : match.start()] in (". ", "! ", "? "):
+            replacement = replacement[0].upper() + replacement[1:]
+        return replacement
+
+    return _WRONG_EMERGENCY_NUMBER_PATTERN.sub(_replace, text)
 
 
 class TriageServiceError(Exception):
@@ -106,6 +136,14 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     # despite instructions, we enforce it ourselves. Never let a missing
     # disclaimer slip through - this is a hard project rule, not optional.
     data.setdefault("disclaimer", DEFAULT_DISCLAIMER)
+
+    # Defense-in-depth: scrub any wrong-country emergency number out of
+    # free-text fields before they ever reach the user (see comment on
+    # _sanitize_emergency_number above).
+    if isinstance(data.get("recommended_action"), str):
+        data["recommended_action"] = _sanitize_emergency_number(data["recommended_action"])
+    if isinstance(data.get("disclaimer"), str):
+        data["disclaimer"] = _sanitize_emergency_number(data["disclaimer"])
 
     try:
         return SymptomAnalysisResponse(**data)
