@@ -25,6 +25,10 @@ class Settings:
     APP_NAME: str = os.getenv("APP_NAME", "MediAssist AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
+    # Google Sheets (Health Passport persistent storage)
+    GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
+    GOOGLE_SHEETS_CREDENTIALS: str = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "")
+
     def validate(self) -> None:
         """
         Fail fast and loud if required config is missing, instead of
@@ -34,6 +38,11 @@ class Settings:
             raise RuntimeError(
                 "GEMINI_API_KEY is not set. Copy .env.example to .env "
                 "and add your Gemini API key."
+            )
+        if not self.GOOGLE_SHEET_ID or not self.GOOGLE_SHEETS_CREDENTIALS:
+            raise RuntimeError(
+                "GOOGLE_SHEET_ID and GOOGLE_SHEETS_CREDENTIALS must both be set "
+                "for Health Passport storage. See README for setup steps."
             )
 
 
