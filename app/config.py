@@ -32,6 +32,16 @@ class Settings:
     # Authentication
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
 
+    # CORS - comma-separated list of frontend origins allowed to call this API.
+    # Defaults cover the deployed Vercel frontend + local dev (Vite's default
+    # port). Override via env var to add/change origins without a code change.
+    _default_origins = "https://medi-assist-nu.vercel.app,http://localhost:5173"
+    ALLOWED_ORIGINS: list[str] = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
+        if origin.strip()
+    ]
+
     def validate(self) -> None:
         """
         Fail fast and loud if required config is missing, instead of
