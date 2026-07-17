@@ -20,6 +20,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,6 +30,7 @@ export default function Login() {
     const next = {};
     if (!name.trim()) next.name = "Enter your full name.";
     if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid email address.";
+    if (password.length < 8) next.password = "Password must be at least 8 characters.";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -37,8 +39,14 @@ export default function Login() {
     e.preventDefault();
     if (!validate()) return;
     setIsSubmitting(true);
-    login({ name, email });
-    setTimeout(() => navigate(ROUTES.DASHBOARD), 300);
+    try {
+      await login({ name, email, password });
+      navigate(ROUTES.DASHBOARD);
+    } catch (err) {
+      setErrors({ form: err.message || "Sign in failed. Please try again." });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -108,12 +116,28 @@ export default function Login() {
               {errors.email && <p className="text-xs text-danger">{errors.email}</p>}
             </div>
 
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="At least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={!!errors.password}
+              />
+              {errors.password && <p className="text-xs text-danger">{errors.password}</p>}
+            </div>
+
+            {errors.form && <p className="text-xs text-danger">{errors.form}</p>}
+
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Signing in..." : "Continue"}
             </Button>
 
             <p className="text-center text-xs text-ink-faint">
-              Demo access — no password required for this hackathon build.
+              First time here? Just enter your details — an account will be created
+              automatically.
             </p>
           </form>
         </div>

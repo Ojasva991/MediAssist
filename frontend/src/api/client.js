@@ -15,8 +15,21 @@ export const apiClient = axios.create({
   },
 });
 
-// Attach a request id / timestamp hook point (auth tokens would go here later)
+// Attach the stored access token (if any) to every outgoing request.
 apiClient.interceptors.request.use((config) => {
+  const stored = localStorage.getItem("mediassist_session");
+  if (stored) {
+    try {
+      const { accessToken } = JSON.parse(stored);
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+    } catch {
+      // malformed session data - let the request go out unauthenticated,
+      // the backend will correctly reject it with 401 and AuthContext
+      // will clear the bad session on the resulting error.
+    }
+  }
   return config;
 });
 
