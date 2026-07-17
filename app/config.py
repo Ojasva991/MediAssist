@@ -25,9 +25,9 @@ class Settings:
     APP_NAME: str = os.getenv("APP_NAME", "MediAssist AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
-    # Google Sheets (Health Passport persistent storage)
-    GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
-    GOOGLE_SHEETS_CREDENTIALS: str = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "")
+    # Database (Postgres) - replaces the old Google Sheets storage.
+    # Example: postgresql://user:password@host:5432/dbname
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
     # Authentication
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
@@ -52,10 +52,11 @@ class Settings:
                 "GEMINI_API_KEY is not set. Copy .env.example to .env "
                 "and add your Gemini API key."
             )
-        if not self.GOOGLE_SHEET_ID or not self.GOOGLE_SHEETS_CREDENTIALS:
+        if not self.DATABASE_URL:
             raise RuntimeError(
-                "GOOGLE_SHEET_ID and GOOGLE_SHEETS_CREDENTIALS must both be set "
-                "for Health Passport storage. See README for setup steps."
+                "DATABASE_URL is not set. Create a free Postgres database "
+                "(Supabase/Neon/Render all work) and set its connection "
+                "string as DATABASE_URL. See README for setup steps."
             )
         if not self.JWT_SECRET_KEY:
             raise RuntimeError(

@@ -15,9 +15,10 @@ const FEATURES = [
   { icon: ShieldCheck, text: "Built for emergencies, designed for calm" },
 ];
 
-export default function Login() {
-  const { user, login } = useAuth();
+export default function Signup() {
+  const { user, signup } = useAuth();
   const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
@@ -27,8 +28,9 @@ export default function Login() {
 
   function validate() {
     const next = {};
+    if (!name.trim()) next.name = "Enter your full name.";
     if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid email address.";
-    if (!password) next.password = "Enter your password.";
+    if (password.length < 8) next.password = "Password must be at least 8 characters.";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -38,10 +40,14 @@ export default function Login() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
-      await login({ email, password });
+      await signup({ name, email, password });
       navigate(ROUTES.DASHBOARD);
     } catch (err) {
-      setErrors({ form: err.message || "Incorrect email or password." });
+      setErrors({
+        form: err.status === 409
+          ? "An account with this email already exists."
+          : err.message || "Could not create account. Please try again.",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -53,11 +59,11 @@ export default function Login() {
         <Logo className="[&_span]:text-white" />
         <div className="max-w-sm">
           <h2 className="font-display text-3xl font-bold leading-tight">
-            Clarity, right when you need it most.
+            Your health info, ready before you need it.
           </h2>
           <p className="mt-3 text-sm text-blue-100">
-            MediAssist AI reads your symptoms, gives you a clear next step, and keeps
-            your full medical history one tap away — even in an emergency.
+            Create an account to build your health passport and get instant AI
+            symptom guidance whenever something feels off.
           </p>
           <ul className="mt-8 space-y-4">
             {FEATURES.map(({ icon: Icon, text }) => (
@@ -79,12 +85,24 @@ export default function Login() {
             <Logo />
           </div>
 
-          <h1 className="font-display text-2xl font-bold text-ink">Welcome back</h1>
+          <h1 className="font-display text-2xl font-bold text-ink">Create your account</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Sign in to access your symptom analysis and health passport.
+            Takes less than a minute — you can fill in your health passport after.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Full name</Label>
+              <Input
+                id="name"
+                placeholder="Jordan Lee"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                aria-invalid={!!errors.name}
+              />
+              {errors.name && <p className="text-xs text-danger">{errors.name}</p>}
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -103,7 +121,7 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Your password"
+                placeholder="At least 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 aria-invalid={!!errors.password}
@@ -114,13 +132,13 @@ export default function Login() {
             {errors.form && <p className="text-xs text-danger">{errors.form}</p>}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign in"}
+              {isSubmitting ? "Creating account..." : "Create account"}
             </Button>
 
             <p className="text-center text-xs text-ink-faint">
-              New here?{" "}
-              <Link to={ROUTES.SIGNUP} className="font-medium text-primary hover:underline">
-                Create an account
+              Already have an account?{" "}
+              <Link to={ROUTES.LOGIN} className="font-medium text-primary hover:underline">
+                Sign in
               </Link>
             </p>
           </form>

@@ -5,6 +5,7 @@ import { ROUTES } from "@/constants/routes";
 
 import Splash from "@/pages/Splash";
 import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
 import SymptomAnalysis from "@/pages/SymptomAnalysis";
 import AnalysisResult from "@/pages/AnalysisResult";
@@ -19,6 +20,7 @@ export default function App() {
         <Routes>
           <Route path={ROUTES.SPLASH} element={<Splash />} />
           <Route path={ROUTES.LOGIN} element={<Login />} />
+          <Route path={ROUTES.SIGNUP} element={<Signup />} />
 
           <Route element={<AppShell />}>
             <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />

@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.routes import analyze, auth, passport
+from app.storage.db import Base, engine
+from app.storage import models  # noqa: F401 - import registers the tables with Base
 
 # ---------------------------------------------------------------------
 # Logging
@@ -110,6 +112,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------
+# Database tables
+# ---------------------------------------------------------------------
+
+
+@app.on_event("startup")
+def create_tables() -> None:
+    """
+    Create the users/passports tables if they don't exist yet.
+
+    Replaces what get_or_create_worksheet() used to do for Google
+    Sheets - runs once per process start, safe to call every time
+    since it's a no-op if the tables already exist.
+    """
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables verified/created.")
+
 
 # ---------------------------------------------------------------------
 # Global Exception Handler
