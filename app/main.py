@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routes import analyze, passport
+from app.routes import analyze, auth, passport
 
 # ---------------------------------------------------------------------
 # Logging
@@ -31,6 +31,10 @@ tags_metadata = [
         "description": "System status and health monitoring endpoints.",
     },
     {
+        "name": "Authentication",
+        "description": "Sign up, log in, and obtain access tokens.",
+    },
+    {
         "name": "Symptom Analysis",
         "description": (
             "Analyze user symptoms using AI to estimate medical urgency "
@@ -41,7 +45,7 @@ tags_metadata = [
         "name": "Health Passport",
         "description": (
             "Create, update, retrieve and delete a user's emergency "
-            "medical information."
+            "medical information. Requires authentication."
         ),
     },
 ]
@@ -183,5 +187,6 @@ def health_check():
 # Routers
 # ---------------------------------------------------------------------
 
+app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(passport.router)

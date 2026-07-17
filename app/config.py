@@ -29,6 +29,9 @@ class Settings:
     GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
     GOOGLE_SHEETS_CREDENTIALS: str = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "")
 
+    # Authentication
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
+
     def validate(self) -> None:
         """
         Fail fast and loud if required config is missing, instead of
@@ -43,6 +46,11 @@ class Settings:
             raise RuntimeError(
                 "GOOGLE_SHEET_ID and GOOGLE_SHEETS_CREDENTIALS must both be set "
                 "for Health Passport storage. See README for setup steps."
+            )
+        if not self.JWT_SECRET_KEY:
+            raise RuntimeError(
+                "JWT_SECRET_KEY is not set. Generate one and set it as an "
+                "environment variable - see README for instructions."
             )
 
 

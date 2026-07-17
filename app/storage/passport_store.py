@@ -1,21 +1,19 @@
 """
 Google Sheets-backed storage for Health Passport records.
 
-Replaces the original in-memory dict (see git history) with a real
-persistent store: a Google Sheet, accessed via a service account.
-Data now survives backend restarts, redeploys, and Render free-tier
-cold starts.
+Data lives in the "Passports" tab of the shared spreadsheet (see
+sheets_client.py). Survives backend restarts, redeploys, and Render
+free-tier cold starts.
 
 Storage is still isolated behind these three functions, so route code
-(app/routes/passport.py) required ZERO changes to pick this up.
+(app/routes/passport.py) requires no changes to swap implementations
+in the future.
 
 Sheet layout (row 1 = header, one row per user_id):
 user_id | name | age | blood_group | allergies | medications |
 chronic_diseases | emergency_contact_name | emergency_contact_phone
 
 Notes:
-- gspread client + worksheet handle are created once per process and
-  reused (cheaper than reconnecting on every request).
 - Optional passport fields are stored as empty strings in the sheet
   (Sheets has no concept of `null`) and converted back to None on read.
 - This is intentionally simple (fetch-all-rows, scan for user_id) which
@@ -24,23 +22,15 @@ Notes:
   upgrade path for real production use (see HANDOFF.md Section 2.4).
 """
 
-import json
 import logging
 from typing import Optional
 
-import gspread
-from google.oauth2.service_account import Credentials
-
-from app.config import settings
 from app.models.passport import HealthPassport
+from app.storage.sheets_client import get_or_create_worksheet
 
 logger = logging.getLogger(__name__)
 
-_SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
+_TAB_NAME = "Passports"
 _COLUMNS = [
     "user_id",
     "name",
@@ -53,34 +43,13 @@ _COLUMNS = [
     "emergency_contact_phone",
 ]
 
-_worksheet = None  # lazily initialized, reused across requests
+_worksheet = None  # cached across requests within a process
 
 
 def _get_worksheet():
-    """Return a cached worksheet handle, creating the connection on first use."""
     global _worksheet
-    if _worksheet is not None:
-        return _worksheet
-
-    if not settings.GOOGLE_SHEET_ID or not settings.GOOGLE_SHEETS_CREDENTIALS:
-        raise RuntimeError(
-            "GOOGLE_SHEET_ID and GOOGLE_SHEETS_CREDENTIALS must be set to use "
-            "Health Passport storage."
-        )
-
-    creds_dict = json.loads(settings.GOOGLE_SHEETS_CREDENTIALS)
-    credentials = Credentials.from_service_account_info(creds_dict, scopes=_SCOPES)
-    client = gspread.authorize(credentials)
-
-    sheet = client.open_by_key(settings.GOOGLE_SHEET_ID)
-    _worksheet = sheet.sheet1
-
-    # Make sure the header row exists and matches what we expect, so a
-    # freshly created blank sheet still works without manual setup.
-    existing_header = _worksheet.row_values(1)
-    if existing_header != _COLUMNS:
-        _worksheet.update("A1", [_COLUMNS])
-
+    if _worksheet is None:
+        _worksheet = get_or_create_worksheet(_TAB_NAME, _COLUMNS)
     return _worksheet
 
 
@@ -110,7 +79,6 @@ def _passport_to_row(user_id: str, passport: HealthPassport) -> list:
 
 
 def _row_to_passport(row: list) -> HealthPassport:
-    # row follows _COLUMNS order; pad defensively in case a row is short
     padded = row + [""] * (len(_COLUMNS) - len(row))
     (
         _user_id,
