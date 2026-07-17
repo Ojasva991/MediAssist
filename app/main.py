@@ -10,8 +10,12 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
+from app.rate_limit import limiter
 from app.routes import analyze, auth, passport
 from app.storage.db import Base, engine
 from app.storage import models  # noqa: F401 - import registers the tables with Base
@@ -100,6 +104,14 @@ Always consult a qualified healthcare professional during medical emergencies.
     },
     openapi_tags=tags_metadata,
 )
+
+# ---------------------------------------------------------------------
+# Rate Limiting
+# ---------------------------------------------------------------------
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ---------------------------------------------------------------------
 # CORS

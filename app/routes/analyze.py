@@ -11,13 +11,15 @@ No business logic is implemented here.
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.ai.triage_service import analyze_symptoms
+from app.config import settings
 from app.models.symptom import (
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
 )
+from app.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -64,18 +66,24 @@ a replacement for professional medical advice.
         },
     },
 )
+@limiter.limit(settings.RATE_LIMIT_ANALYZE)
 def analyze(
-    request: SymptomAnalysisRequest,
+    request: Request,
+    payload: SymptomAnalysisRequest,
 ) -> SymptomAnalysisResponse:
     """
     Analyze symptoms and estimate medical urgency.
 
     This endpoint performs AI-assisted symptom triage and returns a
     structured assessment. It never attempts to diagnose diseases.
+
+    Rate limited per client IP (see app.rate_limit / settings.RATE_LIMIT_ANALYZE)
+    - this endpoint calls the Gemini API, which costs money per request and
+    has no authentication gate, so it needs its own abuse protection.
     """
 
     try:
-        return analyze_symptoms(request)
+        return analyze_symptoms(payload)
 
     except Exception as e:
         logger.exception("Unexpected error in /analyze: %s", e)

@@ -42,6 +42,11 @@ class Settings:
         if origin.strip()
     ]
 
+    # Rate limiting - format is "<count>/<period>", e.g. "10/minute".
+    # See slowapi/limits docs for supported period strings.
+    # Applied per client IP address (see app/rate_limit.py).
+    RATE_LIMIT_ANALYZE: str = os.getenv("RATE_LIMIT_ANALYZE", "10/minute")
+
     def validate(self) -> None:
         """
         Fail fast and loud if required config is missing, instead of
