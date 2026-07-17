@@ -16,7 +16,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
 from app.rate_limit import limiter
-from app.routes import analyze, auth, passport
+from app.routes import analyze, auth, history, passport
 from app.storage.db import Base, engine
 from app.storage import models  # noqa: F401 - import registers the tables with Base
 
@@ -52,6 +52,13 @@ tags_metadata = [
         "description": (
             "Create, update, retrieve and delete a user's emergency "
             "medical information. Requires authentication."
+        ),
+    },
+    {
+        "name": "Analysis History",
+        "description": (
+            "Retrieve a logged-in user's past symptom analyses. "
+            "Requires authentication."
         ),
     },
 ]
@@ -222,3 +229,4 @@ def health_check():
 app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(passport.router)
+app.include_router(history.router)
