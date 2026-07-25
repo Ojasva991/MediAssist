@@ -136,6 +136,17 @@ class SymptomAnalysisResponse(BaseModel):
             "never lower what the LLM assessed."
         ),
     )
+    llm_severity: Optional[Severity] = Field(
+        default=None,
+        description=(
+            "The AI's own original severity assessment, BEFORE reconciliation "
+            "with the rule engine. None for fallback responses (no LLM call "
+            "was made). When this differs from the final `severity` above, "
+            "the rule engine raised the urgency level - a signal worth "
+            "surfacing to the user rather than hiding, since it means the "
+            "two systems disagreed."
+        ),
+    )
     retrieved_guidance: list[GuidanceReference] = Field(
         default_factory=list,
         description=(

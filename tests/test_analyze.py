@@ -256,6 +256,37 @@ def test_rule_engine_overrides_an_llm_that_downplays_a_red_flag(client, monkeypa
     # The LLM's own text/possible_conditions are left untouched - only
     # severity/sos_recommended are reconciled.
     assert body["possible_conditions"] == ["Muscle strain"]
+    # The confidence/disagreement signal: the AI's own original guess is
+    # preserved separately from the final, rule-engine-escalated severity.
+    assert body["llm_severity"] == "LOW"
+    assert body["llm_severity"] != body["severity"]
+
+
+def test_llm_severity_matches_final_severity_when_they_agree(client, monkeypatch):
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Tension headache"],
+            "severity": "LOW",
+            "recommended_action": "Rest and hydrate.",
+            "sos_recommended": False,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    resp = client.post("/analyze", json=VALID_PAYLOAD)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["llm_severity"] == "LOW"
+    assert body["llm_severity"] == body["severity"]
+
+
+def test_fallback_response_has_no_llm_severity(client, monkeypatch):
+    # No LLM call was made during a fallback, so there's nothing to
+    # compare the rule engine's severity against.
+    _mock_gemini_failure(monkeypatch)
+    resp = client.post("/analyze", json=VALID_PAYLOAD)
+    assert resp.status_code == 200
+    assert resp.json()["llm_severity"] is None
 
 
 def test_rule_engine_findings_present_even_when_llm_agrees(client, monkeypatch):

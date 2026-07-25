@@ -170,9 +170,12 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     # situation.
     llm_severity_raw = data.get("severity")
     if llm_severity_raw in ("LOW", "MODERATE", "HIGH", "EMERGENCY"):
-        data["severity"] = more_urgent(rule_result.severity, Severity(llm_severity_raw)).value
+        llm_severity_enum = Severity(llm_severity_raw)
+        data["severity"] = more_urgent(rule_result.severity, llm_severity_enum).value
+        data["llm_severity"] = llm_severity_enum.value
     else:
         data["severity"] = rule_result.severity.value
+        data["llm_severity"] = None
     data["sos_recommended"] = bool(data.get("sos_recommended")) or rule_result.sos_recommended
     data["rule_engine"] = RuleEngineFindings(
         severity=rule_result.severity, fired_rules=rule_result.fired_rules

@@ -35,7 +35,10 @@ export default function AnalysisResult() {
     disclaimer,
     rule_engine: ruleEngine,
     retrieved_guidance: retrievedGuidance = [],
+    llm_severity: llmSeverity,
   } = result;
+
+  const severityWasEscalated = llmSeverity && llmSeverity !== severity;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -108,7 +111,14 @@ export default function AnalysisResult() {
               <ListChecks className="size-4 text-ink-soft" /> Why this urgency level
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            {severityWasEscalated && (
+              <p className="rounded-[var(--radius-control)] bg-warning-light px-3 py-2 text-xs text-warning">
+                Our safety check raised this from the AI's initial read of{" "}
+                <strong>{llmSeverity}</strong> to <strong>{severity}</strong>, based on the
+                reasons below.
+              </p>
+            )}
             <ul className="space-y-2 text-sm text-ink-soft">
               {ruleEngine.fired_rules.map((rule, i) => (
                 <li key={i} className="flex items-start gap-2">
