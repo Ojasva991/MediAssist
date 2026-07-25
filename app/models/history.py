@@ -68,3 +68,19 @@ class FeedbackRequest(BaseModel):
     is_helpful: bool = Field(
         ..., description="True for thumbs-up, False for thumbs-down."
     )
+
+
+class TrendFinding(BaseModel):
+    """
+    One recurring-symptom pattern detected across a user's recent
+    history (see app/insights/trends.py). Informational only - never
+    a diagnosis, just "you've mentioned X repeatedly lately."
+    """
+
+    keyword: str = Field(..., description="The recurring symptom keyword.")
+    occurrences: int = Field(
+        ..., description="Number of separate analyses this keyword appeared in."
+    )
+    window_days: int = Field(
+        ..., description="The lookback window (in days) this count covers."
+    )

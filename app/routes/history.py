@@ -11,7 +11,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import get_current_user_id
-from app.models.history import AnalysisHistoryItem, FeedbackRequest
+from app.insights.trends import detect_trends
+from app.models.history import AnalysisHistoryItem, FeedbackRequest, TrendFinding
 from app.storage.history_store import get_history, get_history_owner, save_feedback
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,30 @@ def read_history(
             detail="You are not authorized to view this user's history.",
         )
     return get_history(user_id, limit=limit)
+
+
+@router.get("/{user_id}/trends", response_model=list[TrendFinding])
+def read_trends(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+) -> list[TrendFinding]:
+    """
+    Surface recurring symptom keywords across a user's recent history
+    (see app/insights/trends.py) - e.g. "you've mentioned 'headache' in
+    4 analyses over the last 14 days." Informational only, never a
+    diagnosis. Returns [] if there isn't enough recent history to
+    detect a real pattern from.
+    """
+    if user_id != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view this user's history.",
+        )
+    # Pull the full retained window (not just the default page size) so
+    # trend detection sees everything within its lookback period, not
+    # just whatever a UI page-size default happens to be.
+    entries = get_history(user_id, limit=50)
+    return detect_trends(entries)
 
 
 @router.post("/{user_id}/{history_id}/feedback")

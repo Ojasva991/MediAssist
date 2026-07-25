@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Stethoscope, BookHeart, Siren, LogOut } from "lucide-react";
+import { LayoutGrid, Stethoscope, BookHeart, Clock, Siren, LogOut } from "lucide-react";
 import { Logo } from "@/components/common/Logo";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/context/AuthContext";
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", to: ROUTES.DASHBOARD, icon: LayoutGrid },
   { label: "Symptom Analysis", to: ROUTES.SYMPTOM_ANALYSIS, icon: Stethoscope },
   { label: "Health Passport", to: ROUTES.PASSPORT, icon: BookHeart },
+  { label: "History", to: ROUTES.HISTORY, icon: Clock },
   { label: "SOS", to: ROUTES.SOS, icon: Siren, danger: true },
 ];
 
@@ -34,7 +35,7 @@ export function Sidebar({ className, onNavigate }) {
                   ? danger
                     ? "bg-danger-light text-danger"
                     : "bg-primary-light text-primary-dark"
-                  : "text-ink-soft hover:bg-slate-50 hover:text-ink"
+                  : "text-ink-soft hover:bg-[var(--color-mist)] hover:text-ink"
               )
             }
           >
@@ -56,7 +57,7 @@ export function Sidebar({ className, onNavigate }) {
           <button
             onClick={logout}
             aria-label="Log out"
-            className="rounded-md p-1.5 text-ink-faint transition-colors hover:bg-slate-100 hover:text-danger"
+            className="rounded-md p-1.5 text-ink-faint transition-colors hover:bg-[var(--color-mist)] hover:text-danger"
           >
             <LogOut className="size-4" />
           </button>

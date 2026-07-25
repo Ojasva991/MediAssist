@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import SymptomAnalysis from "@/pages/SymptomAnalysis";
 import AnalysisResult from "@/pages/AnalysisResult";
 import Passport from "@/pages/Passport";
+import History from "@/pages/History";
 import SOS from "@/pages/SOS";
 import NotFound from "@/pages/NotFound";
 
@@ -29,6 +30,7 @@ export default function App() {
               <Route path={ROUTES.SYMPTOM_ANALYSIS} element={<SymptomAnalysis />} />
               <Route path={ROUTES.ANALYSIS_RESULT} element={<AnalysisResult />} />
               <Route path={ROUTES.PASSPORT} element={<Passport />} />
+              <Route path={ROUTES.HISTORY} element={<History />} />
               <Route path={ROUTES.SOS} element={<SOS />} />
             </Route>
 

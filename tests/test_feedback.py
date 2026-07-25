@@ -115,3 +115,36 @@ def test_history_entries_without_feedback_show_null(client, monkeypatch, make_us
 
     history_resp = client.get(f"/history/{user_id}", headers=headers)
     assert history_resp.json()[0]["feedback"] is None
+
+
+def test_trends_route_requires_authentication(client):
+    resp = client.get("/history/some-user-id/trends")
+    assert resp.status_code == 401
+
+
+def test_trends_route_returns_empty_for_new_user(client, make_user):
+    headers, user_id, _ = make_user()
+    resp = client.get(f"/history/{user_id}/trends", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_trends_route_detects_recurring_symptom(client, monkeypatch, make_user):
+    headers, user_id, _ = make_user()
+    for _ in range(3):
+        _mock_gemini_success(monkeypatch, _SUCCESS_RESPONSE)
+        payload = {**_ANALYZE_PAYLOAD, "symptoms": "Persistent headache again"}
+        resp = client.post("/analyze", json=payload, headers=headers)
+        assert resp.status_code == 200
+
+    resp = client.get(f"/history/{user_id}/trends", headers=headers)
+    assert resp.status_code == 200
+    keywords = {f["keyword"] for f in resp.json()}
+    assert "headache" in keywords
+
+
+def test_cannot_view_another_users_trends(client, make_user):
+    headers_a, user_id_a, _ = make_user()
+    headers_b, _user_id_b, _ = make_user()
+    resp = client.get(f"/history/{user_id_a}/trends", headers=headers_b)
+    assert resp.status_code == 403
