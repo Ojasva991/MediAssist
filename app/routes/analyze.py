@@ -149,7 +149,8 @@ def analyze(
 
     if current_user_id:
         try:
-            save_analysis(current_user_id, resolved_payload, result)
+            history_id = save_analysis(current_user_id, resolved_payload, result)
+            result = result.model_copy(update={"history_id": history_id})
         except Exception as e:
             # History is a nice-to-have, not core functionality - the user
             # must still get their analysis even if saving it fails.

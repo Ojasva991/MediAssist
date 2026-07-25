@@ -69,3 +69,29 @@ class AnalysisHistoryRecord(Base):
     recommended_action = Column(String(1000), nullable=False)
     sos_recommended = Column(Boolean, nullable=False)
     disclaimer = Column(String(1000), nullable=False)
+
+
+class AnalysisFeedbackRecord(Base):
+    """
+    Thumbs-up/down feedback on one saved analysis (see
+    AnalysisHistoryRecord above). One feedback row per history entry -
+    `history_id` is unique, so submitting feedback again on the same
+    analysis updates the existing row rather than creating a second one.
+
+    This is a brand-new table, not a column added to an existing one -
+    unlike the `gender` column added to `passports` earlier, this needs
+    NO manual `ALTER TABLE` against production. Base.metadata.create_all()
+    creates any table that doesn't exist yet, and this one never existed
+    before, so it's created automatically on the next deploy.
+    """
+
+    __tablename__ = "analysis_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    history_id = Column(Integer, nullable=False, unique=True, index=True)
+    user_id = Column(String(24), nullable=False, index=True)
+    is_helpful = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

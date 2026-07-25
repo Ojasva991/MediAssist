@@ -1,15 +1,27 @@
+import { useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, RefreshCcw, Siren, ListChecks, BookOpen } from "lucide-react";
+import { ArrowLeft, RefreshCcw, Siren, ListChecks, BookOpen, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SeverityBadge } from "@/components/symptom/SeverityBadge";
+import { useToast } from "@/components/ui/toast";
+import { submitAnalysisFeedback } from "@/api/history";
+import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/constants/routes";
 
 export default function AnalysisResult() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const toast = useToast();
   const { result, payload } = location.state ?? {};
+
+  // Local-only state for which button is highlighted/disabled while a
+  // feedback submission is in flight - not persisted here, since the
+  // saved value lives on the backend and this page doesn't re-fetch it.
+  const [feedbackGiven, setFeedbackGiven] = useState(null);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   if (!result) {
     return (
@@ -36,9 +48,24 @@ export default function AnalysisResult() {
     rule_engine: ruleEngine,
     retrieved_guidance: retrievedGuidance = [],
     llm_severity: llmSeverity,
+    history_id: historyId,
   } = result;
 
   const severityWasEscalated = llmSeverity && llmSeverity !== severity;
+
+  async function handleFeedback(isHelpful) {
+    if (!user || !historyId || isSubmittingFeedback) return;
+    setIsSubmittingFeedback(true);
+    try {
+      await submitAnalysisFeedback(user.userId, historyId, isHelpful);
+      setFeedbackGiven(isHelpful);
+      toast.success("Thanks for the feedback");
+    } catch (err) {
+      toast.error(err.message || "Could not submit feedback");
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -144,6 +171,34 @@ export default function AnalysisResult() {
                 {g.topic}
               </Badge>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {historyId && (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <p className="text-sm text-ink-soft">Was this analysis helpful?</p>
+            <div className="flex gap-2">
+              <Button
+                variant={feedbackGiven === true ? "default" : "outline"}
+                size="sm"
+                disabled={isSubmittingFeedback}
+                onClick={() => handleFeedback(true)}
+                aria-label="This analysis was helpful"
+              >
+                <ThumbsUp className="size-4" />
+              </Button>
+              <Button
+                variant={feedbackGiven === false ? "danger" : "outline"}
+                size="sm"
+                disabled={isSubmittingFeedback}
+                onClick={() => handleFeedback(false)}
+                aria-label="This analysis was not helpful"
+              >
+                <ThumbsDown className="size-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

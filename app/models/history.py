@@ -8,7 +8,7 @@ got back, plus when it happened.
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.symptom import Severity
 
@@ -33,6 +33,14 @@ class AnalysisHistoryItem(BaseModel):
     sos_recommended: bool
     disclaimer: str
 
+    feedback: bool | None = Field(
+        default=None,
+        description=(
+            "Thumbs-up (true) / thumbs-down (false) feedback already given "
+            "on this analysis, or null if none has been given yet."
+        ),
+    )
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -48,6 +56,15 @@ class AnalysisHistoryItem(BaseModel):
                 "recommended_action": "Seek emergency medical attention immediately.",
                 "sos_recommended": True,
                 "disclaimer": "This is not a medical diagnosis.",
+                "feedback": None,
             }
         }
     }
+
+
+class FeedbackRequest(BaseModel):
+    """Body for POST /history/{user_id}/{history_id}/feedback."""
+
+    is_helpful: bool = Field(
+        ..., description="True for thumbs-up, False for thumbs-down."
+    )

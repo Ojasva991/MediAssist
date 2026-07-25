@@ -155,6 +155,16 @@ class SymptomAnalysisResponse(BaseModel):
             "the corpus was relevant enough to the described symptoms."
         ),
     )
+    history_id: Optional[int] = Field(
+        default=None,
+        description=(
+            "ID of the saved history entry for this analysis, set only "
+            "when the caller was logged in (so it could be saved at all - "
+            "see app/routes/analyze.py). Used to submit feedback via "
+            "POST /history/{user_id}/{history_id}/feedback. None for "
+            "anonymous callers."
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {
