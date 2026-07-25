@@ -16,11 +16,13 @@ to say "we couldn't analyze this" over guessing.
 import logging
 
 from app.models.symptom import (
+    GuidanceReference,
     RuleEngineFindings,
     Severity,
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
 )
+from app.rag.retriever import retrieve as retrieve_guidance
 from app.rules.engine import evaluate as evaluate_rules, more_urgent
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,10 @@ def build_fallback_response(request: SymptomAnalysisRequest) -> SymptomAnalysisR
     from a real AI analysis (which always lists at least one condition).
     """
     rule_result = evaluate_rules(request)
+    guidance_entries = retrieve_guidance(request.symptoms, top_k=3)
+    guidance_refs = [
+        GuidanceReference(source=g.source, topic=g.topic) for g in guidance_entries
+    ]
 
     if rule_result.severity == Severity.EMERGENCY:
         logger.warning(
@@ -62,6 +68,7 @@ def build_fallback_response(request: SymptomAnalysisRequest) -> SymptomAnalysisR
             rule_engine=RuleEngineFindings(
                 severity=rule_result.severity, fired_rules=rule_result.fired_rules
             ),
+            retrieved_guidance=guidance_refs,
         )
 
     # Even if no rule fired, being unable to run the real analysis at all
@@ -90,4 +97,5 @@ def build_fallback_response(request: SymptomAnalysisRequest) -> SymptomAnalysisR
         rule_engine=RuleEngineFindings(
             severity=rule_result.severity, fired_rules=rule_result.fired_rules
         ),
+        retrieved_guidance=guidance_refs,
     )

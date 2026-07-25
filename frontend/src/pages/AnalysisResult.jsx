@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, RefreshCcw, Siren, ListChecks } from "lucide-react";
+import { ArrowLeft, RefreshCcw, Siren, ListChecks, BookOpen } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ export default function AnalysisResult() {
     sos_recommended,
     disclaimer,
     rule_engine: ruleEngine,
+    retrieved_guidance: retrievedGuidance = [],
   } = result;
 
   return (
@@ -116,6 +117,23 @@ export default function AnalysisResult() {
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {retrievedGuidance.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <BookOpen className="size-4 text-ink-soft" /> Reference guidance used
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {retrievedGuidance.map((g, i) => (
+              <Badge key={i} variant="neutral" className="text-xs">
+                {g.topic}
+              </Badge>
+            ))}
           </CardContent>
         </Card>
       )}

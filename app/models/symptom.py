@@ -102,6 +102,18 @@ class RuleEngineFindings(BaseModel):
     )
 
 
+class GuidanceReference(BaseModel):
+    """
+    One piece of first-aid/triage guidance (see app/rag/corpus.py) that
+    was retrieved as context for this analysis - included so the caller
+    can see what grounded the AI's recommendation, not just trust the
+    generated paragraph blindly.
+    """
+
+    source: str
+    topic: str
+
+
 class SymptomAnalysisResponse(BaseModel):
     """What we send back to the frontend after analysis."""
 
@@ -122,6 +134,14 @@ class SymptomAnalysisResponse(BaseModel):
             "The final `severity` above is always at least as urgent as "
             "rule_engine.severity - the rule engine can only raise urgency, "
             "never lower what the LLM assessed."
+        ),
+    )
+    retrieved_guidance: list[GuidanceReference] = Field(
+        default_factory=list,
+        description=(
+            "First-aid/triage guidance entries retrieved as grounding "
+            "context for this analysis (see app/rag/). Empty if nothing in "
+            "the corpus was relevant enough to the described symptoms."
         ),
     )
 

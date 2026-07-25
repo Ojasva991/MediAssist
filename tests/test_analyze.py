@@ -285,3 +285,31 @@ def test_fallback_response_includes_rule_engine_findings(client, monkeypatch):
     body = resp.json()
     assert body["rule_engine"]["severity"] == "EMERGENCY"
     assert len(body["rule_engine"]["fired_rules"]) == 1
+
+
+def test_analyze_response_includes_retrieved_guidance(client, monkeypatch):
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Possible cardiac event"],
+            "severity": "EMERGENCY",
+            "recommended_action": "Seek emergency care immediately.",
+            "sos_recommended": True,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    payload = {**VALID_PAYLOAD, "symptoms": "Sudden chest pain radiating to my arm"}
+    resp = client.post("/analyze", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["retrieved_guidance"]
+    assert any(g["topic"] == "Chest pain / suspected heart attack" for g in body["retrieved_guidance"])
+
+
+def test_fallback_response_also_includes_retrieved_guidance(client, monkeypatch):
+    _mock_gemini_failure(monkeypatch)
+    payload = {**VALID_PAYLOAD, "symptoms": "Sudden chest pain and shortness of breath"}
+    resp = client.post("/analyze", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["retrieved_guidance"]

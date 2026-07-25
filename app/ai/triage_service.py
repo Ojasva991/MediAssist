@@ -20,11 +20,13 @@ from app.ai.fallback import build_fallback_response
 from app.ai.gemini_client import gemini_client, GeminiClientError
 from app.ai.prompts import SYSTEM_PROMPT, build_analysis_prompt
 from app.models.symptom import (
+    GuidanceReference,
     RuleEngineFindings,
     Severity,
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
 )
+from app.rag.retriever import retrieve as retrieve_guidance
 from app.rules.engine import evaluate as evaluate_rules, more_urgent
 
 logger = logging.getLogger(__name__)
@@ -133,8 +135,9 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     (`rule_engine` field) for transparency either way.
     """
     rule_result = evaluate_rules(request)
+    guidance_entries = retrieve_guidance(request.symptoms, top_k=3)
 
-    user_prompt = build_analysis_prompt(request)
+    user_prompt = build_analysis_prompt(request, guidance_entries)
 
     try:
         raw_text = gemini_client.generate(SYSTEM_PROMPT, user_prompt)
@@ -174,6 +177,9 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     data["rule_engine"] = RuleEngineFindings(
         severity=rule_result.severity, fired_rules=rule_result.fired_rules
     )
+    data["retrieved_guidance"] = [
+        GuidanceReference(source=g.source, topic=g.topic) for g in guidance_entries
+    ]
 
     try:
         return SymptomAnalysisResponse(**data)

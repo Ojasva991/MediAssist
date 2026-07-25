@@ -9,6 +9,7 @@ triage_service.py) means:
 """
 
 from app.models.symptom import SymptomAnalysisRequest
+from app.rag.corpus import GuidanceEntry
 
 # The system prompt sets the AI's role and hard rules. This is sent on
 # every request and does not change based on user input.
@@ -46,9 +47,19 @@ Required JSON output shape (exact field names):
 }"""
 
 
-def build_analysis_prompt(request: SymptomAnalysisRequest) -> str:
+def build_analysis_prompt(
+    request: SymptomAnalysisRequest,
+    guidance: list[GuidanceEntry] | None = None,
+) -> str:
     """
     Build the user-turn prompt from a validated SymptomAnalysisRequest.
+
+    `guidance` is an optional list of retrieved first-aid/triage
+    reference entries (see app/rag/retriever.py) relevant to the
+    reported symptoms. When present, they're included as grounding
+    context - reference material the model should weigh, not a script
+    it must follow verbatim, and never a substitute for its own
+    judgement or the strict rules in SYSTEM_PROMPT.
 
     Note: `request` has already passed Pydantic validation by the time
     it reaches here (age bounds, non-blank symptoms, etc.) - this
@@ -60,6 +71,17 @@ def build_analysis_prompt(request: SymptomAnalysisRequest) -> str:
         else "Existing conditions: None reported"
     )
 
+    guidance_block = ""
+    if guidance:
+        entries_text = "\n".join(f'- ({g.topic}) {g.content}' for g in guidance)
+        guidance_block = f"""
+
+Reference first-aid/triage guidance (context only - use your own
+judgement; this is general reference material, not a mandatory script,
+and does not override any of your strict rules above):
+{entries_text}
+"""
+
     return f"""Analyze the following patient information and return the
 triage JSON as instructed.
 
@@ -68,5 +90,5 @@ Gender: {request.gender}
 Symptoms: {request.symptoms}
 Duration: {request.duration}
 {conditions_line}
-
+{guidance_block}
 Return ONLY the JSON object described in your instructions."""
