@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { Pencil, Trash2, BookHeart, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { PassportSkeleton } from "@/components/passport/PassportSkeleton";
+import { useToast } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,7 @@ import { getPassport, upsertPassport, deletePassport } from "@/api/passport";
 
 export default function Passport() {
   const { user } = useAuth();
+  const toast = useToast();
   const [passport, setPassport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -57,8 +60,10 @@ export default function Passport() {
       const saved = await upsertPassport(user.userId, formValues);
       setPassport(saved ?? formValues);
       setMode("view");
+      toast.success("Health passport saved");
     } catch (err) {
       setSaveError(err);
+      toast.error(err.message || "Could not save your health passport");
     } finally {
       setIsSaving(false);
     }
@@ -70,8 +75,10 @@ export default function Passport() {
       await deletePassport(user.userId);
       setPassport(null);
       setDeleteOpen(false);
+      toast.success("Health passport deleted");
     } catch (err) {
       setLoadError(err);
+      toast.error(err.message || "Could not delete your health passport");
     } finally {
       setIsDeleting(false);
     }
@@ -79,8 +86,14 @@ export default function Passport() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center text-ink-faint">
-        <Spinner size={24} className="mr-2" /> Loading your health passport...
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-6 w-48 animate-pulse rounded-md bg-border" />
+            <div className="h-4 w-72 animate-pulse rounded-md bg-border" />
+          </div>
+        </div>
+        <PassportSkeleton />
       </div>
     );
   }

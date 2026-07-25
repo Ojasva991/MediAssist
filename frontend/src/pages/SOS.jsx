@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { SosInfoSkeleton } from "@/components/sos/SosInfoSkeleton";
 import { useAuth } from "@/context/AuthContext";
 import { getPassport } from "@/api/passport";
 import { ROUTES } from "@/constants/routes";
@@ -82,11 +82,7 @@ export default function SOS() {
           Show this to first responders
         </h2>
 
-        {isLoading && (
-          <div className="flex h-40 items-center justify-center text-ink-faint">
-            <Spinner size={22} className="mr-2" /> Loading your medical info...
-          </div>
-        )}
+        {isLoading && <SosInfoSkeleton />}
 
         {error && (
           <div className="rounded-[var(--radius-control)] bg-danger-light px-4 py-3 text-sm text-danger">

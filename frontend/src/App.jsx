@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/components/ui/toast";
 import { AppShell } from "@/components/layout/AppShell";
 import { ROUTES } from "@/constants/routes";
 
@@ -16,23 +17,25 @@ import NotFound from "@/pages/NotFound";
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path={ROUTES.SPLASH} element={<Splash />} />
-          <Route path={ROUTES.LOGIN} element={<Login />} />
-          <Route path={ROUTES.SIGNUP} element={<Signup />} />
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path={ROUTES.SPLASH} element={<Splash />} />
+            <Route path={ROUTES.LOGIN} element={<Login />} />
+            <Route path={ROUTES.SIGNUP} element={<Signup />} />
 
-          <Route element={<AppShell />}>
-            <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
-            <Route path={ROUTES.SYMPTOM_ANALYSIS} element={<SymptomAnalysis />} />
-            <Route path={ROUTES.ANALYSIS_RESULT} element={<AnalysisResult />} />
-            <Route path={ROUTES.PASSPORT} element={<Passport />} />
-            <Route path={ROUTES.SOS} element={<SOS />} />
-          </Route>
+            <Route element={<AppShell />}>
+              <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+              <Route path={ROUTES.SYMPTOM_ANALYSIS} element={<SymptomAnalysis />} />
+              <Route path={ROUTES.ANALYSIS_RESULT} element={<AnalysisResult />} />
+              <Route path={ROUTES.PASSPORT} element={<Passport />} />
+              <Route path={ROUTES.SOS} element={<SOS />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }
