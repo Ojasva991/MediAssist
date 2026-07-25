@@ -229,3 +229,59 @@ def test_analyze_requires_age_gender_without_a_saved_passport(client, monkeypatc
 
     anon_resp = client.post("/analyze", json=minimal_payload)
     assert anon_resp.status_code == 400
+
+
+def test_rule_engine_overrides_an_llm_that_downplays_a_red_flag(client, monkeypatch):
+    """The core safety guarantee of the rule engine: even if the LLM
+    reports something as LOW severity, a red-flag keyword match in the
+    rule engine must win - severity can only be pushed up, never down."""
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Muscle strain"],
+            "severity": "LOW",
+            "recommended_action": "Rest should help.",
+            "sos_recommended": False,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    payload = {**VALID_PAYLOAD, "symptoms": "Sudden chest pain radiating to my arm"}
+    resp = client.post("/analyze", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["severity"] == "EMERGENCY"
+    assert body["sos_recommended"] is True
+    assert body["rule_engine"]["severity"] == "EMERGENCY"
+    assert len(body["rule_engine"]["fired_rules"]) == 1
+    # The LLM's own text/possible_conditions are left untouched - only
+    # severity/sos_recommended are reconciled.
+    assert body["possible_conditions"] == ["Muscle strain"]
+
+
+def test_rule_engine_findings_present_even_when_llm_agrees(client, monkeypatch):
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Tension headache"],
+            "severity": "LOW",
+            "recommended_action": "Rest and hydrate.",
+            "sos_recommended": False,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    resp = client.post("/analyze", json=VALID_PAYLOAD)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["severity"] == "LOW"
+    assert body["rule_engine"]["severity"] == "LOW"
+    assert body["rule_engine"]["fired_rules"] == []
+
+
+def test_fallback_response_includes_rule_engine_findings(client, monkeypatch):
+    _mock_gemini_failure(monkeypatch)
+    payload = {**VALID_PAYLOAD, "symptoms": "Sudden chest pain and shortness of breath"}
+    resp = client.post("/analyze", json=payload)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["rule_engine"]["severity"] == "EMERGENCY"
+    assert len(body["rule_engine"]["fired_rules"]) == 1

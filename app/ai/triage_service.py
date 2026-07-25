@@ -19,7 +19,13 @@ from pydantic import ValidationError
 from app.ai.fallback import build_fallback_response
 from app.ai.gemini_client import gemini_client, GeminiClientError
 from app.ai.prompts import SYSTEM_PROMPT, build_analysis_prompt
-from app.models.symptom import SymptomAnalysisRequest, SymptomAnalysisResponse
+from app.models.symptom import (
+    RuleEngineFindings,
+    Severity,
+    SymptomAnalysisRequest,
+    SymptomAnalysisResponse,
+)
+from app.rules.engine import evaluate as evaluate_rules, more_urgent
 
 logger = logging.getLogger(__name__)
 
@@ -117,20 +123,30 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     TriageServiceError is kept as a class in case future callers need
     to distinguish "used fallback" from "fully failed" - currently
     nothing raises it, since the fallback always succeeds.
+
+    Rule engine: runs first, deterministically, before Gemini is even
+    called (see app/rules/engine.py). Its severity is a FLOOR - the
+    final severity returned is whichever of (rule engine, Gemini) is
+    more urgent, so a red-flag keyword match can never be silently
+    downgraded by an LLM call that reads the situation as calmer than
+    it is. The rule engine's findings are attached to the response
+    (`rule_engine` field) for transparency either way.
     """
+    rule_result = evaluate_rules(request)
+
     user_prompt = build_analysis_prompt(request)
 
     try:
         raw_text = gemini_client.generate(SYSTEM_PROMPT, user_prompt)
     except GeminiClientError as e:
         logger.error("Gemini call failed, using fallback: %s", e)
-        return build_fallback_response(request.symptoms)
+        return build_fallback_response(request)
 
     try:
         data = _parse_gemini_json(raw_text)
     except TriageServiceError as e:
         logger.error("Gemini JSON parsing failed, using fallback: %s", e)
-        return build_fallback_response(request.symptoms)
+        return build_fallback_response(request)
 
     # Defensive default: if the model somehow omits the disclaimer
     # despite instructions, we enforce it ourselves. Never let a missing
@@ -145,6 +161,20 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     if isinstance(data.get("disclaimer"), str):
         data["disclaimer"] = _sanitize_emergency_number(data["disclaimer"])
 
+    # Reconcile the rule engine's floor with whatever Gemini reported,
+    # BEFORE validating into the response model - never let a red-flag
+    # keyword match get silently downgraded by the LLM's read of the
+    # situation.
+    llm_severity_raw = data.get("severity")
+    if llm_severity_raw in ("LOW", "MODERATE", "HIGH", "EMERGENCY"):
+        data["severity"] = more_urgent(rule_result.severity, Severity(llm_severity_raw)).value
+    else:
+        data["severity"] = rule_result.severity.value
+    data["sos_recommended"] = bool(data.get("sos_recommended")) or rule_result.sos_recommended
+    data["rule_engine"] = RuleEngineFindings(
+        severity=rule_result.severity, fired_rules=rule_result.fired_rules
+    )
+
     try:
         return SymptomAnalysisResponse(**data)
     except ValidationError as e:
@@ -153,4 +183,4 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
             e,
             data,
         )
-        return build_fallback_response(request.symptoms)
+        return build_fallback_response(request)

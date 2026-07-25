@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, RefreshCcw, Siren } from "lucide-react";
+import { ArrowLeft, RefreshCcw, Siren, ListChecks } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ export default function AnalysisResult() {
     recommended_action,
     sos_recommended,
     disclaimer,
+    rule_engine: ruleEngine,
   } = result;
 
   return (
@@ -99,7 +100,27 @@ export default function AnalysisResult() {
         </Card>
       )}
 
-      <p className="rounded-[var(--radius-control)] bg-slate-50 p-4 text-xs leading-relaxed text-ink-faint">
+      {ruleEngine?.fired_rules?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ListChecks className="size-4 text-ink-soft" /> Why this urgency level
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-ink-soft">
+              {ruleEngine.fired_rules.map((rule, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-ink-faint" />
+                  {rule}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <p className="rounded-[var(--radius-control)] bg-[var(--color-mist)] p-4 text-xs leading-relaxed text-ink-faint">
         {disclaimer}
       </p>
 

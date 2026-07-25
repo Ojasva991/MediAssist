@@ -85,6 +85,23 @@ class SymptomAnalysisRequest(BaseModel):
     }
 
 
+class RuleEngineFindings(BaseModel):
+    """
+    Explainability layer: what the deterministic rule engine
+    (app/rules/engine.py) found, independent of the LLM. Included so the
+    frontend/reviewer can see WHY a severity floor was set, not just
+    trust the LLM's paragraph. `severity` here is the rule engine's OWN
+    assessment - it may be lower than the final `severity` on the
+    response if the LLM assessed something more urgent.
+    """
+
+    severity: Severity
+    fired_rules: list[str] = Field(
+        default_factory=list,
+        description="Human-readable reasons the rule engine set this severity floor.",
+    )
+
+
 class SymptomAnalysisResponse(BaseModel):
     """What we send back to the frontend after analysis."""
 
@@ -97,6 +114,15 @@ class SymptomAnalysisResponse(BaseModel):
     disclaimer: str = Field(
         default="This is not a medical diagnosis. Consult a healthcare professional.",
         description="Always present. Never omit this field.",
+    )
+    rule_engine: Optional[RuleEngineFindings] = Field(
+        default=None,
+        description=(
+            "Deterministic rule-engine findings, included for transparency. "
+            "The final `severity` above is always at least as urgent as "
+            "rule_engine.severity - the rule engine can only raise urgency, "
+            "never lower what the LLM assessed."
+        ),
     )
 
     model_config = {
