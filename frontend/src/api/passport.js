@@ -2,13 +2,15 @@ import { apiClient } from "./client";
 
 /**
  * Confirmed against the live backend's HealthPassport model
- * (app/models/passport.py). Notably: no `gender` field, and
- * allergies/medications/chronic_diseases are free-text strings,
- * not arrays.
+ * (app/models/passport.py). allergies/medications/chronic_diseases are
+ * free-text strings, not arrays.
  *
  * {
  *   name: string,                    // required
  *   age: number,                     // required, 0-120
+ *   gender: string,                  // required - saved once here, reused
+ *                                    // automatically by /analyze instead of
+ *                                    // being asked for on every check
  *   blood_group: "A+"|"A-"|"B+"|"B-"|"AB+"|"AB-"|"O+"|"O-"|"UNKNOWN",
  *   allergies?: string,              // free text, e.g. "Penicillin, Peanuts"
  *   medications?: string,

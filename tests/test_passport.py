@@ -1,6 +1,7 @@
 PASSPORT_PAYLOAD = {
     "name": "Priya Sharma",
     "age": 24,
+    "gender": "Female",
     "blood_group": "O+",
     "allergies": "Penicillin",
     "medications": "None",
@@ -82,5 +83,12 @@ def test_delete_nonexistent_passport_returns_404(client, make_user):
 def test_passport_rejects_invalid_blood_group(client, make_user):
     headers, user_id, _ = make_user()
     bad_payload = {**PASSPORT_PAYLOAD, "blood_group": "Z+"}
+    resp = client.put(f"/passport/{user_id}", json=bad_payload, headers=headers)
+    assert resp.status_code == 422
+
+
+def test_passport_requires_gender(client, make_user):
+    headers, user_id, _ = make_user()
+    bad_payload = {k: v for k, v in PASSPORT_PAYLOAD.items() if k != "gender"}
     resp = client.put(f"/passport/{user_id}", json=bad_payload, headers=headers)
     assert resp.status_code == 422

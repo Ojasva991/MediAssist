@@ -9,10 +9,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle } from "lucide-react";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "UNKNOWN"];
+const GENDERS = ["Female", "Male", "Other"];
 
 const EMPTY_FORM = {
   name: "",
   age: "",
+  gender: "",
   blood_group: "UNKNOWN",
   allergies: "",
   medications: "",
@@ -35,6 +37,7 @@ export function PassportForm({ initialValue, onSubmit, onCancel, isSaving, error
     if (form.age === "" || Number(form.age) < 0 || Number(form.age) > 120) {
       errs.age = "Enter a valid age (0-120).";
     }
+    if (!form.gender) errs.gender = "Select a gender.";
     if (!form.emergency_contact_name.trim()) {
       errs.emergency_contact_name = "Emergency contact name is required.";
     }
@@ -89,6 +92,23 @@ export function PassportForm({ initialValue, onSubmit, onCancel, isSaving, error
                 onChange={(e) => update("age", e.target.value)}
               />
               {formErrors.age && <p className="text-xs text-danger">{formErrors.age}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="gender">Gender</Label>
+              <Select value={form.gender} onValueChange={(v) => update("gender", v)}>
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDERS.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formErrors.gender && <p className="text-xs text-danger">{formErrors.gender}</p>}
             </div>
 
             <div className="space-y-1.5">

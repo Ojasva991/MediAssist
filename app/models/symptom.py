@@ -30,8 +30,25 @@ class Severity(str, Enum):
 class SymptomAnalysisRequest(BaseModel):
     """What the frontend sends us to request a triage analysis."""
 
-    age: int = Field(..., ge=0, le=120, description="Patient age in years (0-120)")
-    gender: str = Field(..., min_length=1, max_length=30)
+    # age/gender are optional here (unlike in the Health Passport, where
+    # they're required): a logged-in caller with a saved passport doesn't
+    # need to send them at all - app/routes/analyze.py fills them in from
+    # the passport before running the analysis. They're still required in
+    # practice for anonymous callers (or logged-in callers with no saved
+    # passport yet) - that's enforced in the route, not here, since it
+    # depends on who's calling, not on the shape of the request alone.
+    age: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=120,
+        description="Patient age (0-120). Optional if saved in your Health Passport.",
+    )
+    gender: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=30,
+        description="Optional if saved in your Health Passport.",
+    )
     symptoms: str = Field(..., min_length=3, max_length=1000)
     duration: str = Field(..., min_length=1, max_length=100)
     existing_conditions: Optional[str] = Field(
@@ -50,10 +67,10 @@ class SymptomAnalysisRequest(BaseModel):
 
     @field_validator("gender")
     @classmethod
-    def gender_not_blank(cls, v: str) -> str:
-        if not v.strip():
+    def gender_not_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
             raise ValueError("gender cannot be blank")
-        return v.strip()
+        return v.strip() if v else v
 
     model_config = {
         "json_schema_extra": {

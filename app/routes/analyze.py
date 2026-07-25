@@ -23,6 +23,7 @@ from app.models.symptom import (
 )
 from app.rate_limit import limiter
 from app.storage.history_store import save_analysis
+from app.storage.passport_store import get_passport
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,54 @@ def analyze(
     has no authentication gate, so it needs its own abuse protection.
     """
 
+    # Fill in age/gender/existing_conditions from the caller's saved Health
+    # Passport when they weren't provided directly - this is what lets a
+    # logged-in user skip re-entering them on every analysis. Anything the
+    # caller DID send in the request takes priority over the saved passport,
+    # so someone can still override for a one-off analysis (e.g. checking
+    # symptoms on behalf of someone else) without editing their own passport.
+    age = payload.age
+    gender = payload.gender
+    existing_conditions = payload.existing_conditions
+
+    if current_user_id and (age is None or not gender or not existing_conditions):
+        try:
+            saved_passport = get_passport(current_user_id)
+        except Exception as e:
+            # A passport lookup failure should never block an analysis the
+            # user is otherwise able to complete - just fall through and
+            # let the missing-fields check below ask for the data directly.
+            logger.exception(
+                "Failed to load Health Passport for %s during /analyze: %s",
+                current_user_id,
+                e,
+            )
+            saved_passport = None
+
+        if saved_passport is not None:
+            if age is None:
+                age = saved_passport.age
+            if not gender:
+                gender = saved_passport.gender
+            if not existing_conditions:
+                existing_conditions = saved_passport.chronic_diseases
+
+    if age is None or not gender:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Age and gender are required for a symptom analysis. Provide "
+                "them directly in this request, or save them once in your "
+                "Health Passport so you never have to enter them again."
+            ),
+        )
+
+    resolved_payload = payload.model_copy(
+        update={"age": age, "gender": gender, "existing_conditions": existing_conditions}
+    )
+
     try:
-        result = analyze_symptoms(payload)
+        result = analyze_symptoms(resolved_payload)
     except Exception as e:
         logger.exception("Unexpected error in /analyze: %s", e)
         raise HTTPException(
@@ -102,7 +149,7 @@ def analyze(
 
     if current_user_id:
         try:
-            save_analysis(current_user_id, payload, result)
+            save_analysis(current_user_id, resolved_payload, result)
         except Exception as e:
             # History is a nice-to-have, not core functionality - the user
             # must still get their analysis even if saving it fails.

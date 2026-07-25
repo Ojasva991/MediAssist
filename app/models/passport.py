@@ -29,6 +29,15 @@ class HealthPassport(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=100)
     age: int = Field(..., ge=0, le=120)
+    gender: str = Field(
+        ...,
+        min_length=1,
+        max_length=30,
+        description=(
+            "Saved once here so it never needs to be re-entered on every "
+            "/analyze call."
+        ),
+    )
     blood_group: BloodGroup = BloodGroup.UNKNOWN
     allergies: Optional[str] = Field(
         default=None, max_length=500, description="Comma-separated or free text"
@@ -42,7 +51,7 @@ class HealthPassport(BaseModel):
     emergency_contact_name: str = Field(..., min_length=1, max_length=100)
     emergency_contact_phone: str = Field(..., min_length=5, max_length=20)
 
-    @field_validator("name", "emergency_contact_name")
+    @field_validator("name", "gender", "emergency_contact_name")
     @classmethod
     def not_blank(cls, v: str) -> str:
         if not v.strip():
@@ -64,6 +73,7 @@ class HealthPassport(BaseModel):
             "example": {
                 "name": "Priya Sharma",
                 "age": 24,
+                "gender": "Female",
                 "blood_group": "O+",
                 "allergies": "Penicillin",
                 "medications": "None",

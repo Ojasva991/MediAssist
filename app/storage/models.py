@@ -25,6 +25,15 @@ class PassportRecord(Base):
     user_id = Column(String(24), primary_key=True)
     name = Column(String(100), nullable=False)
     age = Column(Integer, nullable=False)
+    # Nullable at the DB level (unlike the Pydantic model, where it's
+    # required for all NEW/updated passports) so this stays backward
+    # compatible with passport rows that already exist in production from
+    # before this column was added. Base.metadata.create_all() only creates
+    # MISSING tables - it does not ALTER existing ones - so this column
+    # will not appear in an already-existing `passports` table until you
+    # run, once, against the real database:
+    #   ALTER TABLE passports ADD COLUMN gender VARCHAR(30);
+    gender = Column(String(30), nullable=True)
     blood_group = Column(String(10), nullable=False, default="UNKNOWN")
     allergies = Column(String(500), nullable=True)
     medications = Column(String(500), nullable=True)

@@ -27,6 +27,7 @@ def save_passport(user_id: str, passport: HealthPassport) -> HealthPassport:
 
         record.name = passport.name
         record.age = passport.age
+        record.gender = passport.gender
         record.blood_group = passport.blood_group.value
         record.allergies = passport.allergies
         record.medications = passport.medications
@@ -51,6 +52,11 @@ def get_passport(user_id: str) -> Optional[HealthPassport]:
         return HealthPassport(
             name=record.name,
             age=record.age,
+            # Falls back to a placeholder for rows saved before the gender
+            # column existed (or before the DB migration below has been run) -
+            # the Pydantic model requires a non-blank string, but old rows may
+            # have NULL here. Saving the passport again fills in a real value.
+            gender=record.gender or "Not specified",
             blood_group=record.blood_group or "UNKNOWN",
             allergies=record.allergies,
             medications=record.medications,

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 function InfoRow({ icon: Icon, label, value }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-ink-soft">
+      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-mist)] text-ink-soft">
         <Icon className="size-4" />
       </span>
       <div>
@@ -18,7 +18,7 @@ function InfoRow({ icon: Icon, label, value }) {
 function TextBlock({ icon: Icon, label, value, emptyText }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-ink-soft">
+      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-mist)] text-ink-soft">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
@@ -38,8 +38,9 @@ export function PassportSummary({ passport }) {
         </CardHeader>
         <CardContent className="space-y-5">
           <InfoRow icon={User} label="Full name" value={passport.name} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <InfoRow icon={HeartPulse} label="Age" value={passport.age} />
+            <InfoRow icon={User} label="Gender" value={passport.gender} />
             <InfoRow icon={Droplet} label="Blood group" value={passport.blood_group} />
           </div>
           <InfoRow

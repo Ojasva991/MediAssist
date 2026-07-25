@@ -137,3 +137,95 @@ def test_analyze_logged_out_saves_no_history(client, monkeypatch, make_user):
     history_resp = client.get(f"/history/{user_id}", headers=headers)
     assert history_resp.status_code == 200
     assert history_resp.json() == []
+
+
+PASSPORT_PAYLOAD = {
+    "name": "Priya Sharma",
+    "age": 41,
+    "gender": "Female",
+    "blood_group": "O+",
+    "allergies": "Penicillin",
+    "medications": "None",
+    "chronic_diseases": "Asthma",
+    "emergency_contact_name": "Raj Sharma",
+    "emergency_contact_phone": "+91-9876543210",
+}
+
+
+def test_analyze_uses_saved_passport_when_age_gender_omitted(client, monkeypatch, make_user):
+    """The whole point of the passport-first flow: a logged-in user with a
+    saved passport shouldn't have to send age/gender/existing_conditions at
+    all - they should be pulled from the passport automatically."""
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Tension headache"],
+            "severity": "LOW",
+            "recommended_action": "Rest and stay hydrated.",
+            "sos_recommended": False,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    headers, user_id, _ = make_user()
+    client.put(f"/passport/{user_id}", json=PASSPORT_PAYLOAD, headers=headers)
+
+    minimal_payload = {"symptoms": "Mild headache", "duration": "3 hours"}
+    resp = client.post("/analyze", json=minimal_payload, headers=headers)
+    assert resp.status_code == 200
+
+    history_resp = client.get(f"/history/{user_id}", headers=headers)
+    entry = history_resp.json()[0]
+    assert entry["age"] == 41
+    assert entry["gender"] == "Female"
+    assert entry["existing_conditions"] == "Asthma"
+
+
+def test_analyze_request_values_override_saved_passport(client, monkeypatch, make_user):
+    """Explicit values in the request (e.g. checking symptoms on behalf of
+    someone else) should win over whatever's saved in the caller's own
+    passport."""
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Tension headache"],
+            "severity": "LOW",
+            "recommended_action": "Rest and stay hydrated.",
+            "sos_recommended": False,
+            "disclaimer": "This is not a medical diagnosis.",
+        },
+    )
+    headers, user_id, _ = make_user()
+    client.put(f"/passport/{user_id}", json=PASSPORT_PAYLOAD, headers=headers)
+
+    override_payload = {**VALID_PAYLOAD, "age": 5, "gender": "Male"}
+    client.post("/analyze", json=override_payload, headers=headers)
+
+    history_resp = client.get(f"/history/{user_id}", headers=headers)
+    entry = history_resp.json()[0]
+    assert entry["age"] == 5
+    assert entry["gender"] == "Male"
+
+
+def test_analyze_requires_age_gender_without_a_saved_passport(client, monkeypatch, make_user):
+    """A logged-in user with no passport yet, and an anonymous caller, are
+    the same case here: with nowhere to pull age/gender from, they must be
+    provided directly or the request is rejected with a clear message."""
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": [],
+            "severity": "LOW",
+            "recommended_action": "n/a",
+            "sos_recommended": False,
+            "disclaimer": "n/a",
+        },
+    )
+    headers, _user_id, _ = make_user()  # no passport saved for this user
+    minimal_payload = {"symptoms": "Mild headache", "duration": "3 hours"}
+
+    resp = client.post("/analyze", json=minimal_payload, headers=headers)
+    assert resp.status_code == 400
+    assert "health passport" in resp.json()["detail"].lower()
+
+    anon_resp = client.post("/analyze", json=minimal_payload)
+    assert anon_resp.status_code == 400

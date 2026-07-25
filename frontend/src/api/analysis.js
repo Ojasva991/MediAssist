@@ -8,11 +8,16 @@ import { apiClient } from "./client";
  *
  * Request:
  * {
- *   age: number,               // required, 0-120
- *   gender: string,            // required
+ *   age?: number,              // 0-120. Optional if saved in the caller's
+ *                              // Health Passport - the backend fills it in
+ *                              // automatically for logged-in callers who
+ *                              // omit it. Required otherwise (400 if missing
+ *                              // and no passport exists).
+ *   gender?: string,           // same rule as age
  *   symptoms: string,          // required, single free-text string (not an array)
  *   duration: string,          // required, e.g. "3 days"
- *   existing_conditions?: string
+ *   existing_conditions?: string  // also auto-filled from the Health
+ *                                 // Passport's chronic_diseases when omitted
  * }
  *
  * Response:
