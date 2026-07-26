@@ -16,8 +16,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user_id
-from app.models.passport import HealthPassport
-from app.storage.passport_store import delete_passport, get_passport, save_passport
+from app.models.passport import HealthPassport, PassportAuditLogItem
+from app.storage.passport_store import (
+    delete_passport,
+    get_passport,
+    get_passport_audit_log,
+    save_passport,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,3 +84,18 @@ def remove_passport(
             status_code=404, detail="Health Passport not found for this user_id"
         )
     return {"status": "deleted", "user_id": user_id}
+
+
+@router.get("/{user_id}/audit-log", response_model=list[PassportAuditLogItem])
+def read_passport_audit_log(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+) -> list[PassportAuditLogItem]:
+    """
+    Retrieve the audit trail (who changed what, when) for a user's
+    Health Passport - every create/update/delete, most recent first.
+    Returns [] if the passport has never been touched (or never
+    existed) - never an error.
+    """
+    _ensure_self(user_id, current_user_id)
+    return get_passport_audit_log(user_id)

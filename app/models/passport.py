@@ -6,6 +6,7 @@ during an emergency. This module only defines the *shape* of that data -
 storage (Milestone 5, in-memory for the hackathon) lives elsewhere.
 """
 
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -83,3 +84,27 @@ class HealthPassport(BaseModel):
             }
         }
     }
+
+
+class PassportAuditLogItem(BaseModel):
+    """
+    One audit entry for a Health Passport create/update/delete, as
+    returned by GET /passport/{user_id}/audit-log. Informational/
+    accountability only - "who changed what, when" - not used anywhere
+    else in the app.
+    """
+
+    id: int
+    action: str = Field(..., description='"created", "updated", or "deleted".')
+    changed_fields: Optional[list[str]] = Field(
+        default=None,
+        description='Field names that changed. Only populated for "updated" entries.',
+    )
+    snapshot: Optional[dict] = Field(
+        default=None,
+        description=(
+            "Passport field values at the time of this change - the state "
+            "AFTER a create/update, or the state right BEFORE a delete."
+        ),
+    )
+    created_at: datetime

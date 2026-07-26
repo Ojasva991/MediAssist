@@ -71,6 +71,32 @@ class AnalysisHistoryRecord(Base):
     disclaimer = Column(String(1000), nullable=False)
 
 
+class PassportAuditLogRecord(Base):
+    """
+    One audit entry for a Health Passport create/update/delete.
+
+    Brand-new table, same as `analysis_feedback` above - no manual
+    migration needed, `create_all()` creates it automatically.
+
+    `snapshot` holds the full passport field values at the time of the
+    change (the state AFTER a create/update, or the state right BEFORE
+    a delete) - a dict, stored as JSON. `changed_fields` is only
+    meaningful for "updated" entries: the list of field names whose
+    value actually differed from what was there before. Kept as a
+    separate column rather than making the caller diff two snapshots
+    themselves.
+    """
+
+    __tablename__ = "passport_audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(24), nullable=False, index=True)
+    action = Column(String(10), nullable=False)  # "created" | "updated" | "deleted"
+    changed_fields = Column(JSON, nullable=True)  # list[str], only for "updated"
+    snapshot = Column(JSON, nullable=True)  # dict of passport fields
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class AnalysisFeedbackRecord(Base):
     """
     Thumbs-up/down feedback on one saved analysis (see
