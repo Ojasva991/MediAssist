@@ -6,5 +6,6 @@ export const ROUTES = {
   SYMPTOM_ANALYSIS: "/analysis",
   ANALYSIS_RESULT: "/analysis/result",
   PASSPORT: "/passport",
+  HISTORY: "/history",
   SOS: "/sos",
 };

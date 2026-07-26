@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Stethoscope, BookHeart, Siren, LogOut } from "lucide-react";
+import { LayoutGrid, Stethoscope, BookHeart, Clock, Siren, LogOut } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", to: ROUTES.DASHBOARD, icon: LayoutGrid },
   { label: "Symptom Analysis", to: ROUTES.SYMPTOM_ANALYSIS, icon: Stethoscope },
   { label: "Health Passport", to: ROUTES.PASSPORT, icon: BookHeart },
+  { label: "History", to: ROUTES.HISTORY, icon: Clock },
   { label: "SOS", to: ROUTES.SOS, icon: Siren, danger: true },
 ];
 

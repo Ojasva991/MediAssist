@@ -8,6 +8,7 @@ const TITLES = {
   [ROUTES.SYMPTOM_ANALYSIS]: "Symptom Analysis",
   [ROUTES.ANALYSIS_RESULT]: "Analysis Result",
   [ROUTES.PASSPORT]: "Health Passport",
+  [ROUTES.HISTORY]: "History",
   [ROUTES.SOS]: "Emergency SOS",
 };
 
