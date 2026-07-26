@@ -22,7 +22,7 @@ class Settings:
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
     # App
-    APP_NAME: str = os.getenv("APP_NAME", "MediAssist AI")
+    APP_NAME: str = os.getenv("APP_NAME", "Vaeda AI")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Database (Postgres) - replaces the old Google Sheets storage.

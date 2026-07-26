@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { PassportSummary } from "@/components/passport/PassportSummary";
 import { PassportForm } from "@/components/passport/PassportForm";
+import { DocumentsSection } from "@/components/passport/DocumentsSection";
 import { useAuth } from "@/context/AuthContext";
 import { getPassport, upsertPassport, deletePassport, downloadPassportReport } from "@/api/passport";
 
@@ -192,6 +193,8 @@ export default function Passport() {
       )}
 
       {passport && mode === "view" && <PassportSummary passport={passport} />}
+
+      {passport && mode === "view" && <DocumentsSection userId={user.userId} />}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>

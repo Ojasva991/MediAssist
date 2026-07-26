@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { login as apiLogin, signup as apiSignup } from "@/api/auth";
 
 const AuthContext = createContext(null);
-const STORAGE_KEY = "mediassist_session";
+const STORAGE_KEY = "vaeda_session";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

@@ -17,7 +17,7 @@ export const apiClient = axios.create({
 
 // Attach the stored access token (if any) to every outgoing request.
 apiClient.interceptors.request.use((config) => {
-  const stored = localStorage.getItem("mediassist_session");
+  const stored = localStorage.getItem("vaeda_session");
   if (stored) {
     try {
       const { accessToken } = JSON.parse(stored);

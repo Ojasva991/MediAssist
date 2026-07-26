@@ -1,4 +1,4 @@
-# MediAssist AI — Backend (AI Integration)
+# Vaeda AI — Backend (AI Integration)
 
 AI-powered healthcare triage assistant. **This is not a diagnostic
 tool.** It estimates symptom urgency and recommends a next step (e.g.

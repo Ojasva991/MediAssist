@@ -2,7 +2,7 @@ def test_root_returns_project_info(client):
     resp = client.get("/")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["project"] == "MediAssist AI"
+    assert body["project"] == "Vaeda AI"
     assert body["status"] == "Running"
 
 

@@ -35,7 +35,7 @@ router = APIRouter(tags=["Symptom Analysis"])
     response_model=SymptomAnalysisResponse,
     summary="Analyze User Symptoms",
     description="""
-Analyze user-reported symptoms using the MediAssist AI triage engine.
+Analyze user-reported symptoms using the Vaeda AI triage engine.
 
 The AI estimates the urgency of the reported symptoms and recommends the
 next appropriate medical action.

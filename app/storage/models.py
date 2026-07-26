@@ -5,7 +5,7 @@ Mirrors the exact columns the old Google Sheets tabs used, so no data
 shape changes for the rest of the app - just where it's stored.
 """
 
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, JSON, func
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, JSON, LargeBinary, func
 
 from app.storage.db import Base
 
@@ -69,6 +69,41 @@ class AnalysisHistoryRecord(Base):
     recommended_action = Column(String(1000), nullable=False)
     sos_recommended = Column(Boolean, nullable=False)
     disclaimer = Column(String(1000), nullable=False)
+
+
+class PassportDocumentRecord(Base):
+    """
+    One uploaded medical document (blood test, MRI, X-ray, sonography,
+    prescription, etc.) attached to a user's Health Passport.
+
+    File bytes are stored directly in Postgres (LargeBinary/BYTEA) -
+    deliberately, not in a separate object-storage service (S3,
+    Cloudinary, etc.). That keeps this feature's ops footprint at zero
+    new services/credentials, consistent with how this project has
+    avoided new paid infrastructure everywhere else (no Redis, no
+    Docker, no cloud storage). The real tradeoff: Postgres free tiers
+    (Supabase/Neon/Render) typically cap total database size in the low
+    hundreds of MB to ~1GB, so this does NOT scale to large numbers of
+    large files. app/storage/document_store.py enforces a per-file size
+    cap and a per-user document count cap for exactly this reason. If
+    usage ever outgrows that, the fix is swapping this column for a
+    reference to a real object-storage bucket - a storage-layer change,
+    not a schema change visible to the API.
+
+    Brand-new table, so - same as `analysis_feedback` and
+    `passport_audit_log` before it - no manual migration needed.
+    """
+
+    __tablename__ = "passport_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(24), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    content_type = Column(String(100), nullable=False)
+    category = Column(String(30), nullable=False)
+    file_size = Column(Integer, nullable=False)
+    file_data = Column(LargeBinary, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class PassportAuditLogRecord(Base):

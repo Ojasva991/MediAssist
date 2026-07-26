@@ -16,7 +16,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
 from app.rate_limit import limiter
-from app.routes import analyze, auth, history, passport
+from app.routes import analyze, auth, documents, history, passport
 from app.storage.db import Base, engine
 from app.storage import models  # noqa: F401 - import registers the tables with Base
 
@@ -68,13 +68,13 @@ tags_metadata = [
 # ---------------------------------------------------------------------
 
 app = FastAPI(
-    title="MediAssist AI",
+    title="Vaeda AI",
     description="""
-# 🩺 MediAssist AI
+# 🩺 Vaeda AI
 
 AI-powered healthcare triage assistant.
 
-MediAssist AI helps users:
+Vaeda AI helps users:
 
 - Analyze symptoms using AI
 - Estimate urgency
@@ -103,8 +103,8 @@ Always consult a qualified healthcare professional during medical emergencies.
     version="1.0.0",
     summary="AI-powered healthcare triage and emergency assistance platform",
     contact={
-        "name": "MediAssist AI Team",
-        "email": "team@mediassist.ai",
+        "name": "Vaeda AI Team",
+        "email": "team@vaeda.ai",
     },
     license_info={
         "name": "MIT License",
@@ -189,11 +189,11 @@ async def unhandled_exception_handler(
     "/",
     tags=["System"],
     summary="API Information",
-    description="Returns basic information about the MediAssist AI API.",
+    description="Returns basic information about the Vaeda AI API.",
 )
 def root():
     return {
-        "project": "MediAssist AI",
+        "project": "Vaeda AI",
         "version": "1.0.0",
         "status": "Running",
         "documentation": "/docs",
@@ -229,4 +229,5 @@ def health_check():
 app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(passport.router)
+app.include_router(documents.router)
 app.include_router(history.router)
