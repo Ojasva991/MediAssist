@@ -37,3 +37,21 @@ export async function deletePassport(userId) {
   const { data } = await apiClient.delete(`/passport/${userId}`);
   return data;
 }
+
+/**
+ * GET /passport/{user_id}/report
+ *
+ * Downloads a one-page, doctor-facing PDF summary of the passport plus
+ * the 5 most recent symptom analyses (see app/reports/passport_report.py
+ * on the backend). Returns the raw PDF as a Blob - the caller is
+ * responsible for turning that into an actual file download (see
+ * Passport.jsx for the object-URL-and-click pattern).
+ *
+ * Requires a saved passport - the backend 404s otherwise.
+ */
+export async function downloadPassportReport(userId) {
+  const { data } = await apiClient.get(`/passport/${userId}/report`, {
+    responseType: "blob",
+  });
+  return data;
+}

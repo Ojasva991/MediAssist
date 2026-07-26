@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { SosInfoSkeleton } from "@/components/sos/SosInfoSkeleton";
 import { useAuth } from "@/context/AuthContext";
 import { getPassport } from "@/api/passport";
@@ -9,11 +17,32 @@ import { ROUTES } from "@/constants/routes";
 
 const EMERGENCY_NUMBER = "112"; // India's unified emergency number
 
+/**
+ * Plain-text emergency card, encoded directly into the QR code itself -
+ * deliberately NOT a link to a backend page. Encoding the data directly
+ * means anyone's phone camera can read it immediately with no app, no
+ * login, and no new public/unauthenticated endpoint exposing private
+ * medical data on the backend. Same idea as a MedicAlert bracelet.
+ */
+function buildEmergencyCardText(passport) {
+  const lines = [
+    "EMERGENCY MEDICAL INFO",
+    `Name: ${passport.name}`,
+    `Age: ${passport.age}  Gender: ${passport.gender}  Blood Group: ${passport.blood_group}`,
+    `Allergies: ${passport.allergies?.trim() || "None recorded"}`,
+    `Chronic Conditions: ${passport.chronic_diseases?.trim() || "None recorded"}`,
+    `Medications: ${passport.medications?.trim() || "None recorded"}`,
+    `Emergency Contact: ${passport.emergency_contact_name} - ${passport.emergency_contact_phone}`,
+  ];
+  return lines.join("\n");
+}
+
 export default function SOS() {
   const { user } = useAuth();
   const [passport, setPassport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -120,6 +149,12 @@ export default function SOS() {
               )}
             </div>
 
+            <div className="flex justify-end border-b border-border py-3">
+              <Button variant="outline" size="sm" onClick={() => setQrOpen(true)}>
+                <QrCode className="size-3.5" /> Show QR code
+              </Button>
+            </div>
+
             <div className="divide-y divide-border">
               <div className="py-4">
                 <InfoBlock icon={ShieldAlert} label="Allergies" value={passport.allergies} emptyText="No known allergies recorded" />
@@ -139,6 +174,30 @@ export default function SOS() {
         <Button variant="ghost" size="sm" onClick={load} className="mx-auto flex">
           <RefreshCcw className="size-3.5" /> Refresh info
         </Button>
+      )}
+
+      {passport && (
+        <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Scan for emergency info</DialogTitle>
+              <DialogDescription>
+                Any phone camera can scan this - no app or login needed. The info is
+                encoded directly in the code itself, not a link, so it still works
+                offline.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="rounded-[var(--radius-card)] border border-border bg-white p-4">
+                <QRCodeSVG value={buildEmergencyCardText(passport)} size={220} level="M" />
+              </div>
+              <p className="text-center text-xs text-ink-faint">
+                Contains: name, age, blood group, allergies, conditions, medications, and
+                emergency contact.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

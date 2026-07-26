@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Pencil, Trash2, BookHeart, AlertCircle } from "lucide-react";
+import { Pencil, Trash2, BookHeart, AlertCircle, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PassportSkeleton } from "@/components/passport/PassportSkeleton";
@@ -16,7 +16,7 @@ import {
 import { PassportSummary } from "@/components/passport/PassportSummary";
 import { PassportForm } from "@/components/passport/PassportForm";
 import { useAuth } from "@/context/AuthContext";
-import { getPassport, upsertPassport, deletePassport } from "@/api/passport";
+import { getPassport, upsertPassport, deletePassport, downloadPassportReport } from "@/api/passport";
 
 export default function Passport() {
   const { user } = useAuth();
@@ -31,6 +31,8 @@ export default function Passport() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
 
   const fetchPassport = useCallback(async () => {
     setIsLoading(true);
@@ -84,6 +86,28 @@ export default function Passport() {
     }
   }
 
+  async function handleDownloadReport() {
+    setIsDownloadingReport(true);
+    try {
+      const pdfBlob = await downloadPassportReport(user.userId);
+      // Browsers can't navigate directly to a Blob - this creates a
+      // temporary object URL, clicks a throwaway link to trigger the
+      // download, then cleans both up immediately after.
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "health-summary-report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "Could not generate the report");
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
@@ -110,6 +134,19 @@ export default function Passport() {
 
         {passport && mode === "view" && (
           <div className="flex shrink-0 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadReport}
+              disabled={isDownloadingReport}
+            >
+              {isDownloadingReport ? (
+                <Spinner size={14} />
+              ) : (
+                <FileDown className="size-3.5" />
+              )}
+              Report
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setMode("edit")}>
               <Pencil className="size-3.5" /> Edit
             </Button>
