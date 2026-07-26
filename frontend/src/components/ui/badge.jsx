@@ -10,7 +10,7 @@ const badgeVariants = cva(
         success: "bg-success-light text-success",
         warning: "bg-warning-light text-warning",
         danger: "bg-danger-light text-danger",
-        neutral: "bg-slate-100 text-ink-soft",
+        neutral: "bg-[var(--color-mist)] text-ink-soft",
       },
     },
     defaultVariants: { variant: "default" },

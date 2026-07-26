@@ -1,19 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { ShieldCheck, Stethoscope, BookHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/common/Logo";
 import { PulseLine } from "@/components/common/PulseLine";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/constants/routes";
-
-const FEATURES = [
-  { icon: Stethoscope, text: "AI-powered symptom analysis in seconds" },
-  { icon: BookHeart, text: "One portable health passport, always with you" },
-  { icon: ShieldCheck, text: "Built for emergencies, designed for calm" },
-];
 
 export default function Signup() {
   const { user, signup } = useAuth();
@@ -54,57 +46,48 @@ export default function Signup() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-white lg:flex">
-        <Logo className="[&_span]:text-white" />
-        <div className="max-w-sm">
-          <h2 className="font-display text-3xl font-bold leading-tight">
-            Your health info, ready before you need it.
-          </h2>
-          <p className="mt-3 text-sm text-blue-100">
-            Create an account to build your health passport and get instant AI
-            symptom guidance whenever something feels off.
-          </p>
-          <ul className="mt-8 space-y-4">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-sm">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                  <Icon className="size-4" />
-                </span>
-                {text}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <PulseLine className="w-full opacity-60" color="rgba(255,255,255,0.6)" />
-      </div>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--color-abyss)] px-6 py-12">
+      <div className="relative z-10 flex w-full max-w-sm flex-col items-center animate-fade-up">
+        <svg width="40" height="40" viewBox="0 0 100 100" fill="none" className="shrink-0">
+          <polyline
+            points="14,22 38,74 46,52 53,80 60,52 86,22"
+            fill="none"
+            stroke="var(--color-success)"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <h1 className="mt-4 font-display text-xl font-medium tracking-tight text-[#FBFAF7]">
+          vaeda
+        </h1>
 
-      <div className="flex items-center justify-center bg-bg px-6 py-12">
-        <div className="w-full max-w-sm animate-fade-up">
-          <div className="mb-8 lg:hidden">
-            <Logo />
-          </div>
-
-          <h1 className="font-display text-2xl font-bold text-ink">Create your account</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+        <div className="mt-8 w-full rounded-[var(--radius-card)] border border-[var(--color-abyss-line)] bg-[var(--color-abyss-soft)] p-7 shadow-[var(--shadow-card-hover)] sm:p-8">
+          <h2 className="font-display text-lg font-semibold text-[#FBFAF7]">Create your account</h2>
+          <p className="mt-1 text-sm text-[var(--color-abyss-ink-soft)]">
             Takes less than a minute — you can fill in your health passport after.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+          <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="name">Full name</Label>
+              <Label htmlFor="name" className="text-[var(--color-abyss-ink-soft)]">
+                Full name
+              </Label>
               <Input
                 id="name"
                 placeholder="Jordan Lee"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 aria-invalid={!!errors.name}
+                className="border-[var(--color-abyss-line)] bg-[var(--color-abyss)] text-[#FBFAF7] placeholder:text-[var(--color-abyss-ink-faint)] focus-visible:border-primary focus-visible:ring-primary/30"
               />
               {errors.name && <p className="text-xs text-danger">{errors.name}</p>}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[var(--color-abyss-ink-soft)]">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -112,12 +95,15 @@ export default function Signup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 aria-invalid={!!errors.email}
+                className="border-[var(--color-abyss-line)] bg-[var(--color-abyss)] text-[#FBFAF7] placeholder:text-[var(--color-abyss-ink-faint)] focus-visible:border-primary focus-visible:ring-primary/30"
               />
               {errors.email && <p className="text-xs text-danger">{errors.email}</p>}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-[var(--color-abyss-ink-soft)]">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -125,25 +111,37 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 aria-invalid={!!errors.password}
+                className="border-[var(--color-abyss-line)] bg-[var(--color-abyss)] text-[#FBFAF7] placeholder:text-[var(--color-abyss-ink-faint)] focus-visible:border-primary focus-visible:ring-primary/30"
               />
               {errors.password && <p className="text-xs text-danger">{errors.password}</p>}
             </div>
 
             {errors.form && <p className="text-xs text-danger">{errors.form}</p>}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
               {isSubmitting ? "Creating account..." : "Create account"}
             </Button>
-
-            <p className="text-center text-xs text-ink-faint">
-              Already have an account?{" "}
-              <Link to={ROUTES.LOGIN} className="font-medium text-primary hover:underline">
-                Sign in
-              </Link>
-            </p>
           </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <span className="h-px flex-1 bg-[var(--color-abyss-line)]" />
+            <span className="text-xs uppercase tracking-wide text-[var(--color-abyss-ink-faint)]">or</span>
+            <span className="h-px flex-1 bg-[var(--color-abyss-line)]" />
+          </div>
+
+          <p className="text-center text-sm text-[var(--color-abyss-ink-soft)]">
+            Already have an account?{" "}
+            <Link to={ROUTES.LOGIN} className="font-medium text-[var(--color-success)] hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
+
+      <PulseLine
+        className="absolute inset-x-0 bottom-0 w-full opacity-40"
+        color="var(--color-success)"
+      />
     </div>
   );
 }

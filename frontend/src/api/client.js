@@ -1,7 +1,7 @@
 import axios from "axios";
 
 /**
- * Base URL for the MediAssist FastAPI backend.
+ * Base URL for the Vaeda FastAPI backend.
  * Override via .env -> VITE_API_BASE_URL to point at a local backend during dev.
  */
 export const API_BASE_URL =
@@ -47,7 +47,7 @@ apiClient.interceptors.response.use(
       message =
         "The server is taking longer than usual to respond (it may be waking up from sleep). Please try again in a moment.";
     } else if (!error.response) {
-      message = "Can't reach the MediAssist server. Check your connection and try again.";
+      message = "Can't reach the Vaeda server. Check your connection and try again.";
     } else if (backendMessage) {
       message = backendMessage;
     } else if (status === 404) {

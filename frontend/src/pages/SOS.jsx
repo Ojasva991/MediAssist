@@ -55,7 +55,7 @@ export default function SOS() {
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Button asChild size="lg" className="bg-white text-danger hover:bg-red-50">
+          <Button asChild size="lg" className="bg-white text-danger hover:bg-danger-light">
             <a href={`tel:${EMERGENCY_NUMBER}`}>
               <Phone className="size-4" /> Call {EMERGENCY_NUMBER}
             </a>
@@ -105,24 +105,32 @@ export default function SOS() {
         )}
 
         {!isLoading && passport && (
-          <div className="space-y-4 rounded-[var(--radius-card)] border border-border bg-surface p-5">
+          <div className="rounded-[var(--radius-card)] border border-border bg-surface p-6">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
               <div>
                 <p className="font-display text-lg font-bold text-ink">{passport.name}</p>
-                <p className="text-sm text-ink-soft">
-                  {passport.age ? `${passport.age} years` : ""}
+                <p className="font-mono text-sm text-ink-soft">
+                  {passport.age ? `${passport.age} yrs` : ""}
                 </p>
               </div>
               {passport.blood_group && passport.blood_group !== "UNKNOWN" && (
-                <span className="flex items-center gap-1.5 rounded-full bg-danger-light px-3 py-1.5 text-sm font-bold text-danger">
+                <span className="flex items-center gap-1.5 rounded-full bg-danger-light px-3 py-1.5 font-mono text-sm font-bold text-danger">
                   <Droplet className="size-4" /> {passport.blood_group}
                 </span>
               )}
             </div>
 
-            <InfoBlock icon={ShieldAlert} label="Allergies" value={passport.allergies} emptyText="No known allergies recorded" />
-            <InfoBlock icon={HeartPulse} label="Chronic conditions" value={passport.chronic_diseases} emptyText="None recorded" />
-            <InfoBlock icon={Pill} label="Current medications" value={passport.medications} emptyText="None recorded" />
+            <div className="divide-y divide-border">
+              <div className="py-4">
+                <InfoBlock icon={ShieldAlert} label="Allergies" value={passport.allergies} emptyText="No known allergies recorded" />
+              </div>
+              <div className="py-4">
+                <InfoBlock icon={HeartPulse} label="Chronic conditions" value={passport.chronic_diseases} emptyText="None recorded" />
+              </div>
+              <div className="pt-4">
+                <InfoBlock icon={Pill} label="Current medications" value={passport.medications} emptyText="None recorded" />
+              </div>
+            </div>
           </div>
         )}
       </div>

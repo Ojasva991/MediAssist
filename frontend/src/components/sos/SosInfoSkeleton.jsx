@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  */
 export function SosInfoSkeleton() {
   return (
-    <div className="space-y-4 rounded-[var(--radius-card)] border border-border bg-surface p-5">
+    <div className="space-y-4 rounded-[var(--radius-card)] border border-border bg-surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
         <div className="space-y-2">
           <Skeleton className="h-5 w-32" />

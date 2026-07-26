@@ -1,6 +1,6 @@
-# MediAssist AI — Frontend
+# Vaeda — Frontend
 
-A React + Vite frontend for the MediAssist AI healthcare backend, built for a 24-hour hackathon.
+A React + Vite frontend for the Vaeda healthcare backend, built for a 24-hour hackathon.
 
 ## Stack
 
@@ -73,8 +73,8 @@ in the two API files above if needed.
 
 ## Design system
 
-- **Colors**: Primary `#2563EB`, Danger `#DC2626`, Background `#F8FAFC` (per spec), plus Success/Warning/Ink/Border tokens — defined as CSS variables in `src/index.css` under `@theme`.
-- **Type**: Lexend (headings) + Inter (body/UI).
+- **Colors**: Primary (jade) `#0F6B5C`, Danger `#C22F3A`, Background (porcelain) `#FBFAF7`, ink `#0A0F1A`, plus Success/Warning/Border tokens — defined as CSS variables in `src/index.css` under `@theme`.
+- **Type**: Fraunces (headings/display) + Inter (body/UI) + JetBrains Mono (data).
 - **Signature element**: an animated "vitals pulse" ECG-style line (`src/components/common/PulseLine.jsx`) used in the splash, login, dashboard hero, and SOS states to reinforce the "live health" concept without generic AI-app decoration.
 
 ## Known gaps / good next steps for the team

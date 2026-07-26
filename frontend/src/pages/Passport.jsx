@@ -161,7 +161,7 @@ export default function Passport() {
           <DialogHeader>
             <DialogTitle>Delete health passport?</DialogTitle>
             <DialogDescription>
-              This permanently removes your saved medical profile from MediAssist. This
+              This permanently removes your saved medical profile from Vaeda. This
               can't be undone.
             </DialogDescription>
           </DialogHeader>

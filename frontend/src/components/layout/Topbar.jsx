@@ -13,14 +13,14 @@ const TITLES = {
 
 export function Topbar({ onMenuClick }) {
   const { pathname } = useLocation();
-  const title = TITLES[pathname] ?? "MediAssist AI";
+  const title = TITLES[pathname] ?? "Vaeda";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur sm:px-6">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="rounded-md p-2 text-ink-soft hover:bg-slate-100 lg:hidden"
+          className="rounded-md p-2 text-ink-soft hover:bg-[var(--color-mist)] lg:hidden"
           aria-label="Open menu"
         >
           <Menu className="size-5" />

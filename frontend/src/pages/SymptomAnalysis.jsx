@@ -260,7 +260,7 @@ export default function SymptomAnalysis() {
               </Button>
 
               <p className="text-center text-xs text-ink-faint">
-                MediAssist AI provides informational guidance only and is not a
+                Vaeda provides informational guidance only and is not a
                 substitute for professional medical advice.
               </p>
             </form>
