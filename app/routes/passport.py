@@ -14,9 +14,13 @@ token via POST /auth/signup or POST /auth/login.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 
 from app.auth.dependencies import get_current_user_id
+from app.config import settings
 from app.models.passport import HealthPassport, PassportAuditLogItem
+from app.reports.passport_report import generate_passport_report_pdf
+from app.storage.history_store import get_history
 from app.storage.passport_store import (
     delete_passport,
     get_passport,
@@ -99,3 +103,42 @@ def read_passport_audit_log(
     """
     _ensure_self(user_id, current_user_id)
     return get_passport_audit_log(user_id)
+
+
+@router.get("/{user_id}/report")
+def download_passport_report(
+    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+) -> Response:
+    """
+    Generate a one-page, doctor-facing PDF summary of this user's
+    Health Passport plus their 5 most recent symptom analyses (if any).
+
+    Requires a saved passport (404 if none exists yet - there's nothing
+    meaningful to put in a report). History is best-effort: if fetching
+    it fails for some reason, the report is still generated with just
+    the passport info rather than failing the whole request over a
+    nice-to-have section.
+    """
+    _ensure_self(user_id, current_user_id)
+    passport = get_passport(user_id)
+    if passport is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Health Passport not found for this user_id - nothing to put in a report yet.",
+        )
+
+    try:
+        history = get_history(user_id, limit=5)
+    except Exception as e:
+        logger.exception("Failed to load history for report generation (%s): %s", user_id, e)
+        history = []
+
+    pdf_bytes = generate_passport_report_pdf(passport, history, settings.APP_NAME)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="health-summary-{user_id}.pdf"'
+        },
+    )
