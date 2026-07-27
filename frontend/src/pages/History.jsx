@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, TrendingUp, AlertCircle, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,9 @@ import { SeverityBadge } from "@/components/symptom/SeverityBadge";
 import { getHistory, getTrends } from "@/api/history";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/constants/routes";
+import { computeSeverityTrend, computeTopConditions } from "@/lib/insights";
+import { SeverityTrendChart } from "@/components/history/SeverityTrendChart";
+import { TopConditionsChart } from "@/components/history/TopConditionsChart";
 
 function formatDate(isoString) {
   try {
@@ -76,6 +79,9 @@ export default function History() {
     load();
   }, [load]);
 
+  const severityTrend = useMemo(() => computeSeverityTrend(entries), [entries]);
+  const topConditions = useMemo(() => computeTopConditions(entries, { limit: 5 }), [entries]);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -100,6 +106,36 @@ export default function History() {
                 "{t.keyword}" · {t.occurrences}x in {t.window_days}d
               </Badge>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !loadError && severityTrend.length >= 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <TrendingUp className="size-4 text-primary" /> Severity over time
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SeverityTrendChart data={severityTrend} />
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !loadError && topConditions.items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Sparkles className="size-4 text-primary" />
+              Most common possible conditions
+              <span className="ml-auto font-mono text-xs font-normal text-ink-faint">
+                {topConditions.scope === "this-month" ? "this month" : "all time"}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TopConditionsChart items={topConditions.items} />
           </CardContent>
         </Card>
       )}
