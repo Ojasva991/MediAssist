@@ -47,6 +47,20 @@ class Settings:
     # Applied per client IP address (see app/rate_limit.py).
     RATE_LIMIT_ANALYZE: str = os.getenv("RATE_LIMIT_ANALYZE", "10/minute")
 
+    # Comma-separated list of user_id values allowed to review/approve
+    # staged RAG guidance documents (see app/routes/rag_review.py).
+    # This project has no general role-based access control yet (it's
+    # still on the backlog in PROJECT_STATE.md) - this env var is a
+    # deliberate stopgap, not a real permissions system. A user_id is
+    # the deterministic sha256(lowercased/trimmed email)[:24] computed
+    # in app/auth/security.py; compute it for whichever email(s) should
+    # be allowed to review, and set them here. Empty by default, which
+    # means the review endpoints reject everyone until this is set -
+    # fail closed, not open.
+    ADMIN_USER_IDS: list[str] = [
+        uid.strip() for uid in os.getenv("ADMIN_USER_IDS", "").split(",") if uid.strip()
+    ]
+
     def validate(self) -> None:
         """
         Fail fast and loud if required config is missing, instead of

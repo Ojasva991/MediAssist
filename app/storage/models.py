@@ -106,6 +106,51 @@ class PassportDocumentRecord(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class StagedGuidanceDocument(Base):
+    """
+    One chunk of externally-ingested guidance content, waiting for (or
+    already through) human review before it can be added to the live
+    RAG corpus (app/rag/corpus.py).
+
+    This is the gate described in PROJECT_STATE.md's hybrid-retrieval
+    requirements: ingestion (app/rag/ingest.py) only ever writes rows
+    here with status="pending_review" - it never touches the live
+    corpus directly. A human reviewer (app/routes/rag_review.py) is the
+    only thing that can move a row to "approved", and even then, the
+    live corpus is a separate, explicit step (see rag_review.py) rather
+    than something that happens automatically on approval - so a bad
+    approval can still be caught before it's actually serving answers.
+
+    `source_id` matches an entry in app/rag/sources.py's allowlist -
+    every row here should be traceable back to exactly which source and
+    license it came from, since that's what a reviewer is being asked
+    to sign off on.
+    """
+
+    __tablename__ = "staged_guidance_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_id = Column(String(100), nullable=False, index=True)
+    source_url = Column(String(500), nullable=False)
+    license = Column(String(100), nullable=False)
+    attribution = Column(String(1000), nullable=False)
+
+    # The actual candidate guidance text, chunked by the ingestion job.
+    # A short topic/keyword hint the ingestion job derived, mirroring
+    # the shape of app/rag/corpus.py's GuidanceEntry so an approved row
+    # can be turned into one with minimal translation.
+    topic_hint = Column(String(200), nullable=True)
+    content = Column(String(4000), nullable=False)
+
+    status = Column(String(20), nullable=False, default="pending_review", index=True)
+    # Free-text note from whoever reviewed it - why approved/rejected.
+    review_note = Column(String(1000), nullable=True)
+    reviewed_by = Column(String(24), nullable=True)  # user_id of the reviewer
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    ingested_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class PassportAuditLogRecord(Base):
     """
     One audit entry for a Health Passport create/update/delete.
