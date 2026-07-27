@@ -19,6 +19,8 @@ can still call the emergency number and their emergency contact.
 
 import logging
 import math
+import socket
+from contextlib import contextmanager
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 import json
@@ -31,6 +33,34 @@ logger = logging.getLogger(__name__)
 
 class HospitalLookupError(Exception):
     """Raised when the Overpass API can't be reached or returns bad data."""
+
+
+@contextmanager
+def _force_ipv4_dns():
+    """
+    Forces socket.getaddrinfo to only return IPv4 addresses for the
+    duration of the wrapped block.
+
+    Why this exists: some hosting platforms (Render's free tier among
+    them) have no working outbound IPv6 route in their containers, but
+    Python's urlopen doesn't fall back to IPv4 when DNS hands it an
+    IPv6 address first - it just fails with
+    "OSError: [Errno 101] Network is unreachable" and gives up, even
+    though the same host is perfectly reachable over IPv4. This is a
+    real, observed failure mode (see the Overpass 503s in production
+    logs), not a hypothetical - hence working around it explicitly
+    here rather than assuming a bare urlopen() call is enough.
+    """
+    original_getaddrinfo = socket.getaddrinfo
+
+    def _ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+        return original_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+    socket.getaddrinfo = _ipv4_only
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = original_getaddrinfo
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -99,9 +129,9 @@ def fetch_nearby_hospitals(
         },
     )
     try:
-        with urlopen(request, timeout=20) as response:
+        with _force_ipv4_dns(), urlopen(request, timeout=20) as response:
             payload = json.loads(response.read())
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except (URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
         raise HospitalLookupError(f"Overpass lookup failed: {exc}") from exc
 
     elements = payload.get("elements", [])

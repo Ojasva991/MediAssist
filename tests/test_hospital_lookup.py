@@ -1,4 +1,10 @@
-from app.emergency.hospital_lookup import _element_coords, _format_address, _haversine_km
+from app.emergency.hospital_lookup import (
+    _element_coords,
+    _force_ipv4_dns,
+    _format_address,
+    _haversine_km,
+)
+import socket
 
 
 def test_haversine_zero_distance_for_same_point():
@@ -32,3 +38,33 @@ def test_format_address_combines_available_parts():
 
 def test_format_address_returns_none_when_no_parts():
     assert _format_address({}) is None
+
+
+def test_force_ipv4_dns_forces_af_inet_regardless_of_requested_family():
+    calls = []
+    original = socket.getaddrinfo
+
+    def spy_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        calls.append(family)
+        return []
+
+    socket.getaddrinfo = spy_getaddrinfo
+    try:
+        with _force_ipv4_dns():
+            # Even asking for "any family" (0) or explicitly AF_INET6
+            # should come out as AF_INET once wrapped.
+            socket.getaddrinfo("example.com", 443, family=socket.AF_INET6)
+    finally:
+        socket.getaddrinfo = original
+
+    assert calls == [socket.AF_INET]
+
+
+def test_force_ipv4_dns_restores_original_after_exception():
+    original = socket.getaddrinfo
+    try:
+        with _force_ipv4_dns():
+            raise ValueError("simulated failure inside the block")
+    except ValueError:
+        pass
+    assert socket.getaddrinfo is original
