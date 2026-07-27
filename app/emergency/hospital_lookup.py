@@ -84,7 +84,7 @@ def _build_query(lat: float, lon: float, radius_km: float) -> str:
           way["amenity"="hospital"](around:{radius_m},{lat},{lon});
           relation["amenity"="hospital"](around:{radius_m},{lat},{lon});
         );
-        out center tags;
+        out tags center;
     """.strip()
 
 
@@ -144,6 +144,21 @@ def fetch_nearby_hospitals(
     for url in settings.OVERPASS_API_URLS:
         try:
             payload = _query_one_endpoint(url, query)
+            remark = payload.get("remark")
+            if remark:
+                # Overpass can return 200 OK with an empty result set AND
+                # a "remark" describing why (a warning, a partial timeout,
+                # etc.) - that's a soft failure that looks identical to a
+                # genuine "nothing nearby" unless we surface it. Logging
+                # rather than raising: a remark doesn't always mean the
+                # query fully failed, and we'd still rather show possibly-
+                # partial results than a 503 on an emergency page.
+                logger.warning("Overpass endpoint %s returned a remark: %s", url, remark)
+            logger.info(
+                "Overpass endpoint %s succeeded with %d element(s)",
+                url,
+                len(payload.get("elements", [])),
+            )
             break
         except (URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
             logger.warning("Overpass endpoint %s failed: %s", url, exc)
