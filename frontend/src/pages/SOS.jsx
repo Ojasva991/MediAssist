@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode } from "lucide-react";
+import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode, MapPin, Navigation, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { SosInfoSkeleton } from "@/components/sos/SosInfoSkeleton";
 import { useAuth } from "@/context/AuthContext";
 import { getPassport } from "@/api/passport";
+import { getNearbyHospitals } from "@/api/emergency";
 import { ROUTES } from "@/constants/routes";
 
 const EMERGENCY_NUMBER = "112"; // India's unified emergency number
@@ -43,6 +44,46 @@ export default function SOS() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [qrOpen, setQrOpen] = useState(false);
+
+  // idle | locating | loading | error | done
+  const [hospitalState, setHospitalState] = useState("idle");
+  const [hospitals, setHospitals] = useState([]);
+  const [hospitalError, setHospitalError] = useState(null);
+
+  const findNearbyHospitals = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      setHospitalState("error");
+      setHospitalError("Location isn't available on this device or browser.");
+      return;
+    }
+    setHospitalState("locating");
+    setHospitalError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        setHospitalState("loading");
+        try {
+          const results = await getNearbyHospitals(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          setHospitals(results);
+          setHospitalState("done");
+        } catch (err) {
+          setHospitalError(err.message);
+          setHospitalState("error");
+        }
+      },
+      (geoError) => {
+        setHospitalState("error");
+        setHospitalError(
+          geoError.code === geoError.PERMISSION_DENIED
+            ? "Location permission was denied. Enable it in your browser settings to find nearby hospitals."
+            : "Couldn't get your location. Please try again."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -103,6 +144,82 @@ export default function SOS() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Nearby hospitals - best-effort, works even if not logged in */}
+      <div className="rounded-[var(--radius-card)] border border-border bg-surface p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MapPin className="size-4 text-primary" />
+            <p className="font-display text-sm font-semibold text-ink">Nearby hospitals</p>
+          </div>
+          {hospitalState !== "done" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={findNearbyHospitals}
+              disabled={hospitalState === "locating" || hospitalState === "loading"}
+            >
+              <LocateFixed className="size-3.5" />
+              {hospitalState === "locating"
+                ? "Getting your location…"
+                : hospitalState === "loading"
+                ? "Searching…"
+                : "Find nearby hospitals"}
+            </Button>
+          )}
+          {hospitalState === "done" && (
+            <Button size="sm" variant="ghost" onClick={findNearbyHospitals}>
+              <RefreshCcw className="size-3.5" /> Refresh
+            </Button>
+          )}
+        </div>
+
+        {hospitalState === "error" && (
+          <p className="mt-3 text-sm text-danger">{hospitalError}</p>
+        )}
+
+        {hospitalState === "done" && hospitals.length === 0 && (
+          <p className="mt-3 text-sm text-ink-soft">
+            No hospitals found nearby in our map data. Try calling {EMERGENCY_NUMBER} directly.
+          </p>
+        )}
+
+        {hospitalState === "done" && hospitals.length > 0 && (
+          <ul className="mt-4 space-y-3">
+            {hospitals.map((h, i) => (
+              <li
+                key={`${h.name}-${i}`}
+                className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{h.name}</p>
+                  <p className="mt-0.5 font-mono text-xs text-ink-faint">
+                    {h.distance_km} km away{h.address ? ` · ${h.address}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {h.phone && (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={`tel:${h.phone}`}>
+                        <Phone className="size-3.5" />
+                      </a>
+                    </Button>
+                  )}
+                  <Button asChild size="sm" variant="outline">
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${h.latitude},${h.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Navigation className="size-3.5" /> Directions
+                    </a>
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Critical info at a glance */}

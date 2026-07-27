@@ -47,6 +47,14 @@ class Settings:
     # Applied per client IP address (see app/rate_limit.py).
     RATE_LIMIT_ANALYZE: str = os.getenv("RATE_LIMIT_ANALYZE", "10/minute")
 
+    # OpenStreetMap's free Overpass API - no key/billing account needed.
+    # See app/emergency/hospital_lookup.py for why this was chosen over
+    # a paid places API.
+    OVERPASS_API_URL: str = os.getenv(
+        "OVERPASS_API_URL", "https://overpass-api.de/api/interpreter"
+    )
+    RATE_LIMIT_NEARBY_HOSPITALS: str = os.getenv("RATE_LIMIT_NEARBY_HOSPITALS", "20/minute")
+
     # Comma-separated list of user_id values allowed to review/approve
     # staged RAG guidance documents (see app/routes/rag_review.py).
     # This project has no general role-based access control yet (it's
