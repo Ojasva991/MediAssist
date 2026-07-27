@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode, MapPin, Navigation, LocateFixed } from "lucide-react";
+import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode, MapPin, Navigation, LocateFixed, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +49,7 @@ export default function SOS() {
   const [hospitalState, setHospitalState] = useState("idle");
   const [hospitals, setHospitals] = useState([]);
   const [hospitalError, setHospitalError] = useState(null);
+  const [lastCoords, setLastCoords] = useState(null); // { lat, lon } - set as soon as geolocation succeeds, independent of Overpass's outcome
 
   const findNearbyHospitals = useCallback(() => {
     if (!("geolocation" in navigator)) {
@@ -60,12 +61,11 @@ export default function SOS() {
     setHospitalError(null);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLastCoords({ lat: latitude, lon: longitude });
         setHospitalState("loading");
         try {
-          const results = await getNearbyHospitals(
-            position.coords.latitude,
-            position.coords.longitude
-          );
+          const results = await getNearbyHospitals(latitude, longitude);
           setHospitals(results);
           setHospitalState("done");
         } catch (err) {
@@ -84,6 +84,16 @@ export default function SOS() {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);
+
+  // Zero-backend, zero-API-key fallback: a plain Google Maps search URL.
+  // Works even if every Overpass mirror is down, since it's just a link -
+  // no server round-trip on our side at all. Uses precise coordinates once
+  // we have them (from a successful geolocation call above), otherwise
+  // falls back to Maps' own "near me" search, which asks for location
+  // itself and doesn't need ours.
+  const googleMapsHospitalsUrl = lastCoords
+    ? `https://www.google.com/maps/search/hospitals/@${lastCoords.lat},${lastCoords.lon},14z`
+    : "https://www.google.com/maps/search/hospitals+near+me";
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -181,7 +191,7 @@ export default function SOS() {
 
         {hospitalState === "done" && hospitals.length === 0 && (
           <p className="mt-3 text-sm text-ink-soft">
-            No hospitals found nearby in our map data. Try calling {EMERGENCY_NUMBER} directly.
+            No hospitals found in our map data right now.
           </p>
         )}
 
@@ -220,6 +230,23 @@ export default function SOS() {
             ))}
           </ul>
         )}
+
+        {/* Always available regardless of the Overpass lookup's outcome -
+            this is a plain link, no backend call, so it can't fail the
+            way the lookup above can. Kept as a guaranteed fallback, not
+            the primary path, since inline results (above) are more
+            convenient when they work. */}
+        <div className="mt-4 border-t border-border pt-3">
+          <a
+            href={googleMapsHospitalsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            <ExternalLink className="size-3.5" />
+            Search hospitals near you on Google Maps
+          </a>
+        </div>
       </div>
 
       {/* Critical info at a glance */}
