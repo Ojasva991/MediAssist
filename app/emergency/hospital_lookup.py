@@ -74,7 +74,14 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def _build_query(lat: float, lon: float, radius_km: float) -> str:
     radius_m = int(radius_km * 1000)
-    # amenity=hospital covers the standard OSM tag for hospitals/ERs.
+    # OSM has two coexisting tagging schemes for hospitals:
+    # amenity=hospital (the long-standing convention) and
+    # healthcare=hospital (a newer, more semantic scheme). A given
+    # hospital may only carry one of the two, not both - matching only
+    # amenity=hospital silently misses real, mapped hospitals that
+    # were tagged the newer way. Union both across node/way/relation;
+    # Overpass automatically deduplicates by element id, so a hospital
+    # tagged with both doesn't come back twice.
     # out center gives a usable lat/lon for ways/relations (buildings/
     # campuses mapped as areas, not just points) via their centroid.
     return f"""
@@ -83,6 +90,9 @@ def _build_query(lat: float, lon: float, radius_km: float) -> str:
           node["amenity"="hospital"](around:{radius_m},{lat},{lon});
           way["amenity"="hospital"](around:{radius_m},{lat},{lon});
           relation["amenity"="hospital"](around:{radius_m},{lat},{lon});
+          node["healthcare"="hospital"](around:{radius_m},{lat},{lon});
+          way["healthcare"="hospital"](around:{radius_m},{lat},{lon});
+          relation["healthcare"="hospital"](around:{radius_m},{lat},{lon});
         );
         out tags center;
     """.strip()
@@ -120,27 +130,17 @@ def _query_one_endpoint(url: str, query: str) -> dict:
         return json.loads(response.read())
 
 
-def fetch_nearby_hospitals(
-    lat: float, lon: float, radius_km: float, limit: int
-) -> list[NearbyHospital]:
+def _query_with_fallback(query: str) -> dict:
     """
-    Queries Overpass for hospitals within `radius_km` of (lat, lon),
-    returns up to `limit` results sorted nearest-first.
-
     Tries each URL in settings.OVERPASS_API_URLS in order, moving to
     the next on failure - some public mirrors block/rate-limit shared
     hosting IPs (see settings.OVERPASS_API_URLS's comment), so treating
     this as "try several, not just one" is the actual fix, not just a
     nice-to-have.
 
-    Raises HospitalLookupError only if every configured endpoint fails
-    - callers (see app/routes/emergency.py) turn that into a 503, never
-    a crash, since this is a convenience feature layered on top of an
-    emergency page that must keep working regardless.
+    Raises HospitalLookupError only if every configured endpoint fails.
     """
-    query = _build_query(lat, lon, radius_km)
     errors: list[str] = []
-
     for url in settings.OVERPASS_API_URLS:
         try:
             payload = _query_one_endpoint(url, query)
@@ -159,19 +159,20 @@ def fetch_nearby_hospitals(
                 url,
                 len(payload.get("elements", [])),
             )
-            break
+            return payload
         except (URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
             logger.warning("Overpass endpoint %s failed: %s", url, exc)
             errors.append(f"{url}: {exc}")
-    else:
-        raise HospitalLookupError(
-            f"All {len(settings.OVERPASS_API_URLS)} Overpass endpoint(s) failed: "
-            + "; ".join(errors)
-        )
 
-    elements = payload.get("elements", [])
+    raise HospitalLookupError(
+        f"All {len(settings.OVERPASS_API_URLS)} Overpass endpoint(s) failed: "
+        + "; ".join(errors)
+    )
+
+
+def _parse_hospitals(payload: dict, lat: float, lon: float) -> list[NearbyHospital]:
     results: list[NearbyHospital] = []
-    for element in elements:
+    for element in payload.get("elements", []):
         coords = _element_coords(element)
         if coords is None:
             continue
@@ -189,6 +190,42 @@ def fetch_nearby_hospitals(
                 phone=tags.get("phone") or tags.get("contact:phone"),
             )
         )
-
     results.sort(key=lambda h: h.distance_km)
+    return results
+
+
+# If nothing is found within the requested radius, widen the search
+# once before concluding there's genuinely nothing nearby - OSM
+# hospital-tagging density varies a lot by region, and a too-narrow
+# initial radius shouldn't look identical to "no data at all here."
+_WIDENED_RADIUS_KM = 15.0
+_WIDENED_RADIUS_CAP_KM = 25.0
+
+
+def fetch_nearby_hospitals(
+    lat: float, lon: float, radius_km: float, limit: int
+) -> list[NearbyHospital]:
+    """
+    Queries Overpass for hospitals within `radius_km` of (lat, lon),
+    returns up to `limit` results sorted nearest-first.
+
+    Raises HospitalLookupError only if every configured Overpass mirror
+    fails outright - callers (see app/routes/emergency.py) turn that
+    into a 503, never a crash, since this is a convenience feature
+    layered on top of an emergency page that must keep working
+    regardless. An empty result (mirrors reachable, genuinely nothing
+    found even after widening) is NOT an error - it's a normal outcome
+    the frontend shows as "no hospitals found nearby."
+    """
+    payload = _query_with_fallback(_build_query(lat, lon, radius_km))
+    results = _parse_hospitals(payload, lat, lon)
+
+    if not results and radius_km < _WIDENED_RADIUS_KM:
+        widened_km = min(_WIDENED_RADIUS_KM, _WIDENED_RADIUS_CAP_KM)
+        logger.info(
+            "No hospitals within %.1fkm - widening to %.1fkm before giving up", radius_km, widened_km
+        )
+        payload = _query_with_fallback(_build_query(lat, lon, widened_km))
+        results = _parse_hospitals(payload, lat, lon)
+
     return results[:limit]

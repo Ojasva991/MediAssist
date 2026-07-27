@@ -87,7 +87,10 @@ def test_fetch_falls_back_to_next_endpoint_on_failure(monkeypatch):
         return {"elements": []}
 
     monkeypatch.setattr(hospital_lookup, "_query_one_endpoint", fake_query)
-    result = fetch_nearby_hospitals(23.25, 77.41, 5, 10)
+    # radius=20 is already at/above the widening threshold, so a lone
+    # empty result here shouldn't trigger a second widened attempt -
+    # keeps this test isolated to just the mirror-fallback behavior.
+    result = fetch_nearby_hospitals(23.25, 77.41, 20, 10)
     assert result == []
     assert calls == ["https://bad-mirror.example", "https://good-mirror.example"]
 
@@ -107,3 +110,40 @@ def test_fetch_raises_only_when_all_endpoints_fail(monkeypatch):
     except HospitalLookupError as exc:
         assert "bad-one.example" in str(exc)
         assert "bad-two.example" in str(exc)
+
+
+def test_fetch_widens_radius_once_when_first_attempt_is_empty(monkeypatch):
+    monkeypatch.setattr(settings, "OVERPASS_API_URLS", ["https://mirror.example"])
+    seen_radii = []
+
+    def fake_query(url, query):
+        # radius_km isn't directly in the query dict return, but we can
+        # infer which attempt this is from call order.
+        seen_radii.append(len(seen_radii))
+        if len(seen_radii) == 1:
+            return {"elements": []}  # first (narrow) attempt: nothing found
+        return {
+            "elements": [
+                {"type": "node", "lat": 23.26, "lon": 77.42, "tags": {"name": "Wide Hospital"}}
+            ]
+        }
+
+    monkeypatch.setattr(hospital_lookup, "_query_one_endpoint", fake_query)
+    result = fetch_nearby_hospitals(23.25, 77.41, 5, 10)
+    assert len(seen_radii) == 2  # confirms it retried once after an empty first result
+    assert len(result) == 1
+    assert result[0].name == "Wide Hospital"
+
+
+def test_fetch_does_not_widen_when_already_at_or_above_threshold(monkeypatch):
+    monkeypatch.setattr(settings, "OVERPASS_API_URLS", ["https://mirror.example"])
+    calls = []
+
+    def fake_query(url, query):
+        calls.append(1)
+        return {"elements": []}
+
+    monkeypatch.setattr(hospital_lookup, "_query_one_endpoint", fake_query)
+    result = fetch_nearby_hospitals(23.25, 77.41, 20, 10)
+    assert len(calls) == 1  # no widening retry - already wide enough
+    assert result == []
