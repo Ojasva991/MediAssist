@@ -107,6 +107,19 @@ def _format_address(tags: dict) -> str | None:
     return ", ".join(parts) if parts else None
 
 
+def _query_one_endpoint(url: str, query: str) -> dict:
+    request = Request(
+        url,
+        data=f"data={query}".encode(),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Vaeda-emergency-lookup/1.0 (contact via GitHub repo)",
+        },
+    )
+    with _force_ipv4_dns(), urlopen(request, timeout=20) as response:
+        return json.loads(response.read())
+
+
 def fetch_nearby_hospitals(
     lat: float, lon: float, radius_km: float, limit: int
 ) -> list[NearbyHospital]:
@@ -114,25 +127,32 @@ def fetch_nearby_hospitals(
     Queries Overpass for hospitals within `radius_km` of (lat, lon),
     returns up to `limit` results sorted nearest-first.
 
-    Raises HospitalLookupError on network/parsing failure - callers
-    (see app/routes/emergency.py) turn that into a 503, never a crash,
-    since this is a convenience feature layered on top of an emergency
-    page that must keep working regardless.
+    Tries each URL in settings.OVERPASS_API_URLS in order, moving to
+    the next on failure - some public mirrors block/rate-limit shared
+    hosting IPs (see settings.OVERPASS_API_URLS's comment), so treating
+    this as "try several, not just one" is the actual fix, not just a
+    nice-to-have.
+
+    Raises HospitalLookupError only if every configured endpoint fails
+    - callers (see app/routes/emergency.py) turn that into a 503, never
+    a crash, since this is a convenience feature layered on top of an
+    emergency page that must keep working regardless.
     """
     query = _build_query(lat, lon, radius_km)
-    request = Request(
-        settings.OVERPASS_API_URL,
-        data=f"data={query}".encode(),
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Vaeda-emergency-lookup/1.0",
-        },
-    )
-    try:
-        with _force_ipv4_dns(), urlopen(request, timeout=20) as response:
-            payload = json.loads(response.read())
-    except (URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
-        raise HospitalLookupError(f"Overpass lookup failed: {exc}") from exc
+    errors: list[str] = []
+
+    for url in settings.OVERPASS_API_URLS:
+        try:
+            payload = _query_one_endpoint(url, query)
+            break
+        except (URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
+            logger.warning("Overpass endpoint %s failed: %s", url, exc)
+            errors.append(f"{url}: {exc}")
+    else:
+        raise HospitalLookupError(
+            f"All {len(settings.OVERPASS_API_URLS)} Overpass endpoint(s) failed: "
+            + "; ".join(errors)
+        )
 
     elements = payload.get("elements", [])
     results: list[NearbyHospital] = []

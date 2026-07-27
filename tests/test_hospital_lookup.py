@@ -1,9 +1,13 @@
+from app.config import settings
 from app.emergency.hospital_lookup import (
+    HospitalLookupError,
     _element_coords,
     _force_ipv4_dns,
     _format_address,
     _haversine_km,
+    fetch_nearby_hospitals,
 )
+import app.emergency.hospital_lookup as hospital_lookup
 import socket
 
 
@@ -68,3 +72,38 @@ def test_force_ipv4_dns_restores_original_after_exception():
     except ValueError:
         pass
     assert socket.getaddrinfo is original
+
+
+def test_fetch_falls_back_to_next_endpoint_on_failure(monkeypatch):
+    monkeypatch.setattr(
+        settings, "OVERPASS_API_URLS", ["https://bad-mirror.example", "https://good-mirror.example"]
+    )
+    calls = []
+
+    def fake_query(url, query):
+        calls.append(url)
+        if url == "https://bad-mirror.example":
+            raise OSError("Connection refused")
+        return {"elements": []}
+
+    monkeypatch.setattr(hospital_lookup, "_query_one_endpoint", fake_query)
+    result = fetch_nearby_hospitals(23.25, 77.41, 5, 10)
+    assert result == []
+    assert calls == ["https://bad-mirror.example", "https://good-mirror.example"]
+
+
+def test_fetch_raises_only_when_all_endpoints_fail(monkeypatch):
+    monkeypatch.setattr(
+        settings, "OVERPASS_API_URLS", ["https://bad-one.example", "https://bad-two.example"]
+    )
+
+    def always_fail(url, query):
+        raise OSError("Connection refused")
+
+    monkeypatch.setattr(hospital_lookup, "_query_one_endpoint", always_fail)
+    try:
+        fetch_nearby_hospitals(23.25, 77.41, 5, 10)
+        assert False, "expected HospitalLookupError"
+    except HospitalLookupError as exc:
+        assert "bad-one.example" in str(exc)
+        assert "bad-two.example" in str(exc)

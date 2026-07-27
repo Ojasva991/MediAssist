@@ -47,12 +47,29 @@ class Settings:
     # Applied per client IP address (see app/rate_limit.py).
     RATE_LIMIT_ANALYZE: str = os.getenv("RATE_LIMIT_ANALYZE", "10/minute")
 
-    # OpenStreetMap's free Overpass API - no key/billing account needed.
+    # OpenStreetMap's Overpass API - no key/billing account needed.
     # See app/emergency/hospital_lookup.py for why this was chosen over
     # a paid places API.
-    OVERPASS_API_URL: str = os.getenv(
-        "OVERPASS_API_URL", "https://overpass-api.de/api/interpreter"
-    )
+    #
+    # A LIST, not a single URL: overpass-api.de (the original/default
+    # public instance) is known to actively rate-limit or block
+    # shared/datacenter IP ranges - exactly the situation with Render's
+    # shared free-tier egress IPs (confirmed in production: got an
+    # outright "Connection refused" from it, not a timeout). Mirror
+    # instances differ in how permissive they are, so this tries each
+    # in order and only fails if all of them do. private.coffee's
+    # mirror explicitly advertises itself as free/unlimited for this
+    # kind of use, so it's listed first.
+    OVERPASS_API_URLS: list[str] = [
+        url.strip()
+        for url in os.getenv(
+            "OVERPASS_API_URLS",
+            "https://overpass.private.coffee/api/interpreter,"
+            "https://overpass-api.de/api/interpreter,"
+            "https://overpass.osm.ch/api/interpreter",
+        ).split(",")
+        if url.strip()
+    ]
     RATE_LIMIT_NEARBY_HOSPITALS: str = os.getenv("RATE_LIMIT_NEARBY_HOSPITALS", "20/minute")
 
     # Comma-separated list of user_id values allowed to review/approve
