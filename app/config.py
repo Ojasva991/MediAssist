@@ -57,16 +57,23 @@ class Settings:
     # shared free-tier egress IPs (confirmed in production: got an
     # outright "Connection refused" from it, not a timeout). Mirror
     # instances differ in how permissive they are, so this tries each
-    # in order and only fails if all of them do. private.coffee's
-    # mirror explicitly advertises itself as free/unlimited for this
-    # kind of use, so it's listed first.
+    # in order and only fails if all of them do.
+    #
+    # IMPORTANT: every URL here must have GLOBAL coverage. Some public
+    # Overpass mirrors intentionally host only a regional OSM extract
+    # (e.g. overpass.osm.ch explicitly only contains Switzerland's
+    # data, confirmed on its own site) - querying one of those for a
+    # location outside its region silently succeeds with an empty
+    # result, which looks identical to "genuinely nothing nearby."
+    # That was an actual production bug here once already - don't
+    # add a regional-only mirror back into this list without checking.
     OVERPASS_API_URLS: list[str] = [
         url.strip()
         for url in os.getenv(
             "OVERPASS_API_URLS",
             "https://overpass.private.coffee/api/interpreter,"
             "https://overpass-api.de/api/interpreter,"
-            "https://overpass.osm.ch/api/interpreter",
+            "https://api.openstreetmap.fr/oapi/interpreter",
         ).split(",")
         if url.strip()
     ]
