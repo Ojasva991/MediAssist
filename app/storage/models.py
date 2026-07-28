@@ -201,3 +201,33 @@ class AnalysisFeedbackRecord(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class ReminderRecord(Base):
+    """
+    A medication/follow-up reminder (see app/models/reminder.py for the
+    scope note on what "reminder" actually means here - in-app only, no
+    push/email/SMS).
+
+    `remind_at` is always the NEXT time this reminder is due. For a
+    repeating reminder (repeat_every_days is 1 or 7), completing it
+    (see app/storage/reminder_store.py's complete_reminder) advances
+    `remind_at` forward by that many days rather than deactivating the
+    row - so the same row represents "the next occurrence," not a fixed
+    one-time event, once it's a repeating reminder.
+
+    Brand-new table - no manual migration needed, same as
+    AnalysisFeedbackRecord above.
+    """
+
+    __tablename__ = "reminders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(24), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    notes = Column(String(1000), nullable=True)
+    category = Column(String(20), nullable=False, default="other")
+    remind_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    repeat_every_days = Column(Integer, nullable=True)  # None = one-time
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

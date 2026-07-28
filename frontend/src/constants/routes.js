@@ -7,5 +7,6 @@ export const ROUTES = {
   ANALYSIS_RESULT: "/analysis/result",
   PASSPORT: "/passport",
   HISTORY: "/history",
+  REMINDERS: "/reminders",
   SOS: "/sos",
 };
