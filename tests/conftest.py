@@ -20,6 +20,7 @@ os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173")
 # High enough that the /analyze rate-limit tests don't interfere with
 # every other test hitting the same endpoint in the same test run.
 os.environ.setdefault("RATE_LIMIT_ANALYZE", "1000/minute")
+os.environ.setdefault("RATE_LIMIT_ANALYZE_IMAGE", "1000/minute")
 
 import pytest
 from fastapi.testclient import TestClient

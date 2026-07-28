@@ -33,3 +33,37 @@ export async function analyzeSymptoms(payload) {
   const { data } = await apiClient.post("/analyze", payload);
   return data;
 }
+
+/**
+ * POST /analyze/image (multipart/form-data)
+ *
+ * `image` is a File/Blob. All other fields optional - a photo can be
+ * submitted with zero accompanying text, unlike POST /analyze.
+ *
+ * Response shape is the same SymptomAnalysisResponse as analyzeSymptoms(),
+ * plus:
+ *   visual_observation?: string  // what the AI saw, in its own words
+ *   image_rejected: boolean      // true if this looked like a medical
+ *                                // scan/document rather than a symptom photo
+ */
+export async function analyzeImage({
+  image,
+  symptoms,
+  duration,
+  age,
+  gender,
+  existingConditions,
+}) {
+  const formData = new FormData();
+  formData.append("image", image);
+  if (symptoms) formData.append("symptoms", symptoms);
+  if (duration) formData.append("duration", duration);
+  if (age !== undefined && age !== null && age !== "") formData.append("age", age);
+  if (gender) formData.append("gender", gender);
+  if (existingConditions) formData.append("existing_conditions", existingConditions);
+
+  const { data } = await apiClient.post("/analyze/image", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}

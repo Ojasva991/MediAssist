@@ -84,6 +84,39 @@ class GeminiClient:
 
         return response.text
 
+    def generate_with_image(
+        self, system_prompt: str, user_prompt: str, image_bytes: bytes, mime_type: str
+    ) -> str:
+        """
+        Same contract as generate() above, but sends an image alongside
+        the text prompt for multimodal analysis (see
+        app/ai/triage_service.py's analyze_image). Uses the same model -
+        Gemini 2.0 Flash and later support text+image input in a single
+        call, no separate vision-specific model/endpoint needed.
+        """
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    user_prompt,
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.2,
+                    response_mime_type="application/json",
+                ),
+            )
+        except APIError as e:
+            raise GeminiClientError(f"Gemini API error: {e}") from e
+        except Exception as e:
+            raise GeminiClientError(f"Unexpected error calling Gemini: {e}") from e
+
+        if not response.text:
+            raise GeminiClientError("Gemini returned an empty response")
+
+        return response.text
+
 
 # Module-level singleton - one client instance reused across requests,
 # rather than creating a new one per request.

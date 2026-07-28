@@ -47,6 +47,11 @@ class Settings:
     # Applied per client IP address (see app/rate_limit.py).
     RATE_LIMIT_ANALYZE: str = os.getenv("RATE_LIMIT_ANALYZE", "10/minute")
 
+    # Image-based analysis (POST /analyze/image) - a lower limit than
+    # text /analyze, since a multimodal Gemini call costs more per
+    # request. See app/routes/analyze.py.
+    RATE_LIMIT_ANALYZE_IMAGE: str = os.getenv("RATE_LIMIT_ANALYZE_IMAGE", "5/minute")
+
     # OpenStreetMap's Overpass API - no key/billing account needed.
     # See app/emergency/hospital_lookup.py for why this was chosen over
     # a paid places API.

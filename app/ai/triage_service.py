@@ -18,7 +18,12 @@ from pydantic import ValidationError
 
 from app.ai.fallback import build_fallback_response
 from app.ai.gemini_client import gemini_client, GeminiClientError
-from app.ai.prompts import SYSTEM_PROMPT, build_analysis_prompt
+from app.ai.prompts import (
+    IMAGE_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_analysis_prompt,
+    build_image_analysis_prompt,
+)
 from app.models.symptom import (
     GuidanceReference,
     RuleEngineFindings,
@@ -193,3 +198,133 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
             data,
         )
         return build_fallback_response(request)
+
+
+IMAGE_ANALYSIS_DISCLAIMER_SUFFIX = (
+    " Photo-based assessment is significantly less reliable than an "
+    "in-person examination and cannot rule out serious conditions, "
+    "including skin cancer. If you have a new, changing, or unusual-"
+    "looking growth or wound, see a healthcare professional promptly "
+    "regardless of this assessment."
+)
+
+
+def analyze_image(
+    image_bytes: bytes,
+    mime_type: str,
+    *,
+    age: int | None,
+    gender: str | None,
+    duration: str | None,
+    symptoms_text: str | None,
+    existing_conditions: str | None,
+) -> SymptomAnalysisResponse:
+    """
+    Run a photo-based visual symptom analysis. Mirrors analyze_symptoms()
+    above but for POST /analyze/image - same defense-in-depth pattern
+    (rule-engine severity floor, emergency-number scrubbing, disclaimer
+    enforcement, fallback on any failure), plus image-specific rules (see
+    app/ai/prompts.py's IMAGE_SYSTEM_PROMPT) since photo-based assessment
+    is a meaningfully higher-stakes failure mode than text (see that
+    prompt's docstring for why).
+
+    The rule engine still runs here, using whatever `symptoms_text` was
+    provided alongside the photo (if any) - it cannot see the image
+    itself, so it's a floor based on what the person described in words,
+    not a full safety net for the visual content. That's a real,
+    intentional limitation, not an oversight: the rule engine's red-flag
+    keywords were built for described symptoms, not photos.
+    """
+    rule_engine_request = SymptomAnalysisRequest(
+        age=age,
+        gender=gender,
+        symptoms=(
+            symptoms_text.strip()
+            if symptoms_text and symptoms_text.strip()
+            else "Visible symptom shown in an uploaded photo, no text description provided."
+        ),
+        duration=duration or "Not specified",
+        existing_conditions=existing_conditions,
+    )
+    rule_result = evaluate_rules(rule_engine_request)
+    guidance_entries = retrieve_guidance(symptoms_text, top_k=3) if symptoms_text else []
+
+    user_prompt = build_image_analysis_prompt(
+        age=age,
+        gender=gender,
+        duration=duration,
+        symptoms_text=symptoms_text,
+        existing_conditions=existing_conditions,
+    )
+
+    try:
+        raw_text = gemini_client.generate_with_image(
+            IMAGE_SYSTEM_PROMPT, user_prompt, image_bytes, mime_type
+        )
+    except GeminiClientError as e:
+        logger.error("Gemini image call failed, using fallback: %s", e)
+        return build_fallback_response(rule_engine_request)
+
+    try:
+        data = _parse_gemini_json(raw_text)
+    except TriageServiceError as e:
+        logger.error("Gemini image JSON parsing failed, using fallback: %s", e)
+        return build_fallback_response(rule_engine_request)
+
+    data.setdefault("disclaimer", DEFAULT_DISCLAIMER)
+    # Defense-in-depth: always append the stronger image-specific caveat,
+    # regardless of whether the model already included something similar
+    # per its instructions - never rely solely on the model following
+    # IMAGE_SYSTEM_PROMPT's rule 6 on its own.
+    if (
+        isinstance(data.get("disclaimer"), str)
+        and IMAGE_ANALYSIS_DISCLAIMER_SUFFIX.strip() not in data["disclaimer"]
+    ):
+        data["disclaimer"] = data["disclaimer"].rstrip() + IMAGE_ANALYSIS_DISCLAIMER_SUFFIX
+
+    if isinstance(data.get("recommended_action"), str):
+        data["recommended_action"] = _sanitize_emergency_number(data["recommended_action"])
+    if isinstance(data.get("disclaimer"), str):
+        data["disclaimer"] = _sanitize_emergency_number(data["disclaimer"])
+
+    image_rejected = bool(data.get("image_rejected", False))
+
+    # If the image was rejected (looks like a scan/document, not a photo
+    # of a visible symptom), don't apply the rule-engine severity floor -
+    # there's nothing to triage, and forcing a severity here would imply
+    # an assessment was actually made when it wasn't.
+    if image_rejected:
+        data.setdefault("possible_conditions", [])
+        data.setdefault("severity", "LOW")
+        data.setdefault("sos_recommended", False)
+        data["llm_severity"] = None
+        data["rule_engine"] = None
+        data["retrieved_guidance"] = []
+    else:
+        llm_severity_raw = data.get("severity")
+        if llm_severity_raw in ("LOW", "MODERATE", "HIGH", "EMERGENCY"):
+            llm_severity_enum = Severity(llm_severity_raw)
+            data["severity"] = more_urgent(rule_result.severity, llm_severity_enum).value
+            data["llm_severity"] = llm_severity_enum.value
+        else:
+            data["severity"] = rule_result.severity.value
+            data["llm_severity"] = None
+        data["sos_recommended"] = bool(data.get("sos_recommended")) or rule_result.sos_recommended
+        data["rule_engine"] = RuleEngineFindings(
+            severity=rule_result.severity, fired_rules=rule_result.fired_rules
+        )
+        data["retrieved_guidance"] = [
+            GuidanceReference(source=g.source, topic=g.topic) for g in guidance_entries
+        ]
+
+    data["image_rejected"] = image_rejected
+
+    try:
+        return SymptomAnalysisResponse(**data)
+    except ValidationError as e:
+        logger.error(
+            "Gemini image JSON didn't match expected schema, using fallback: %s | data=%s",
+            e,
+            data,
+        )
+        return build_fallback_response(rule_engine_request)

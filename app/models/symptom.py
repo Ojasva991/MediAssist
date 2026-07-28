@@ -165,6 +165,25 @@ class SymptomAnalysisResponse(BaseModel):
             "anonymous callers."
         ),
     )
+    visual_observation: Optional[str] = Field(
+        default=None,
+        description=(
+            "Plain-language description of what's visible in an uploaded "
+            "image, from POST /analyze/image only - lets the caller "
+            "confirm the AI looked at the right thing. None for text-only "
+            "analyses (POST /analyze)."
+        ),
+    )
+    image_rejected: bool = Field(
+        default=False,
+        description=(
+            "True only for POST /analyze/image when the uploaded image "
+            "looked like a medical scan/document (X-ray, CT, MRI, lab "
+            "report) rather than a photo of a visible symptom - those are "
+            "deliberately not interpreted (see app/ai/prompts.py's "
+            "IMAGE_SYSTEM_PROMPT). Always False for POST /analyze."
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {

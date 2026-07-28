@@ -12,9 +12,9 @@ No business logic is implemented here.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
-from app.ai.triage_service import analyze_symptoms
+from app.ai.triage_service import analyze_image, analyze_symptoms
 from app.auth.dependencies import get_optional_user_id
 from app.config import settings
 from app.models.symptom import (
@@ -28,6 +28,13 @@ from app.storage.passport_store import get_passport
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Symptom Analysis"])
+
+# Same reasoning/caps as Health Passport document uploads
+# (app/storage/document_store.py) - kept in sync deliberately, images
+# submitted here are typically phone-camera photos, same size ballpark
+# as a scanned document.
+MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024  # 8 MB
+ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 @router.post(
@@ -155,5 +162,152 @@ def analyze(
             # History is a nice-to-have, not core functionality - the user
             # must still get their analysis even if saving it fails.
             logger.exception("Failed to save analysis history for %s: %s", current_user_id, e)
+
+    return result
+
+@router.post(
+    "/analyze/image",
+    response_model=SymptomAnalysisResponse,
+    summary="Analyze a Photo of a Visible Symptom",
+    description="""
+Analyze a photo of a visible symptom (skin change, rash, wound, swelling,
+bite, bruise) using the Vaeda AI triage engine's image-analysis mode.
+
+Deliberately NOT for medical scans (X-rays, CT/MRI, lab report photos) -
+the AI is instructed to decline interpreting those (`image_rejected: true`
+in the response) rather than attempt it, since that needs a radiologist
+or the ordering doctor, not general visual AI analysis.
+
+Photo-based assessment is inherently less reliable than an in-person
+exam or even text-described symptoms - see the mandatory extra caveat
+in every response's `disclaimer` field.
+
+⚠️ This endpoint **does not diagnose diseases** and should not be used
+as a replacement for professional medical advice, especially for any
+new, changing, or unusual-looking growth or wound.
+""",
+    responses={
+        200: {"description": "Image analyzed successfully."},
+        400: {"description": "Invalid image (wrong type, too large, or unreadable)."},
+        422: {"description": "Validation error on the accompanying form fields."},
+        500: {"description": "Unexpected internal server error."},
+    },
+)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE_IMAGE)
+async def analyze_image_route(
+    request: Request,
+    image: UploadFile = File(...),
+    symptoms: Optional[str] = Form(default=None, max_length=1000),
+    duration: Optional[str] = Form(default=None, max_length=100),
+    age: Optional[int] = Form(default=None, ge=0, le=120),
+    gender: Optional[str] = Form(default=None, max_length=30),
+    existing_conditions: Optional[str] = Form(default=None, max_length=500),
+    current_user_id: Optional[str] = Depends(get_optional_user_id),
+) -> SymptomAnalysisResponse:
+    """
+    Same auth/history/passport-fill-in behavior as POST /analyze (see
+    that docstring) - works with or without login, saves to history if
+    logged in, fills in age/gender/existing_conditions from a saved
+    Health Passport when the caller doesn't provide them and is logged
+    in. Unlike /analyze, none of the patient-info fields are strictly
+    required here - a photo can be submitted with no accompanying text
+    at all, since the image itself is the primary input.
+    """
+    if image.content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported image type '{image.content_type}'. "
+                f"Allowed: {', '.join(sorted(ALLOWED_IMAGE_CONTENT_TYPES))}."
+            ),
+        )
+
+    image_bytes = await image.read()
+    if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image is too large. Maximum size is {MAX_IMAGE_SIZE_BYTES // (1024 * 1024)}MB.",
+        )
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty.")
+
+    resolved_age = age
+    resolved_gender = gender
+    resolved_existing_conditions = existing_conditions
+
+    if current_user_id and (
+        resolved_age is None or not resolved_gender or not resolved_existing_conditions
+    ):
+        try:
+            saved_passport = get_passport(current_user_id)
+        except Exception as e:
+            logger.exception(
+                "Failed to load Health Passport for %s during /analyze/image: %s",
+                current_user_id,
+                e,
+            )
+            saved_passport = None
+
+        if saved_passport is not None:
+            if resolved_age is None:
+                resolved_age = saved_passport.age
+            if not resolved_gender:
+                resolved_gender = saved_passport.gender
+            if not resolved_existing_conditions:
+                resolved_existing_conditions = saved_passport.chronic_diseases
+
+    try:
+        result = analyze_image(
+            image_bytes,
+            image.content_type,
+            age=resolved_age,
+            gender=resolved_gender,
+            duration=duration,
+            symptoms_text=symptoms,
+            existing_conditions=resolved_existing_conditions,
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in /analyze/image: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while analyzing the image. Please try again.",
+        ) from e
+
+    if current_user_id:
+        # analysis_history.age/gender are NOT NULL (shared table with the
+        # text-only /analyze flow, which always has both by the time it
+        # gets this far). Unlike /analyze, this endpoint deliberately
+        # allows a photo with zero accompanying patient info - so unlike
+        # /analyze, that info may genuinely not exist here. Rather than
+        # fabricate a fake age/gender to satisfy the constraint (which
+        # would misrepresent real data in someone's history), just skip
+        # saving to history in that case - the analysis itself still
+        # succeeds and is returned either way, only the history record
+        # is skipped.
+        if resolved_age is not None and resolved_gender:
+            try:
+                history_request = SymptomAnalysisRequest(
+                    age=resolved_age,
+                    gender=resolved_gender,
+                    symptoms=(
+                        symptoms.strip()
+                        if symptoms and symptoms.strip()
+                        else "[Photo-based analysis]"
+                    ),
+                    duration=duration or "Not specified",
+                    existing_conditions=resolved_existing_conditions,
+                )
+                history_id = save_analysis(current_user_id, history_request, result)
+                result = result.model_copy(update={"history_id": history_id})
+            except Exception as e:
+                logger.exception(
+                    "Failed to save image-analysis history for %s: %s", current_user_id, e
+                )
+        else:
+            logger.info(
+                "Skipping history save for image analysis by %s - no age/gender available "
+                "(neither provided nor found in a saved passport).",
+                current_user_id,
+            )
 
     return result

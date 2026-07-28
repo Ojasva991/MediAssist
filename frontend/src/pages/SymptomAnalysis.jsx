@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Sparkles, AlertCircle, UserCheck, Pencil } from "lucide-react";
+import { Sparkles, AlertCircle, UserCheck, Pencil, Mic, MicOff, MessageSquareText, Camera } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,15 +9,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useApi } from "@/hooks/useApi";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { analyzeSymptoms } from "@/api/analysis";
 import { getPassport } from "@/api/passport";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/constants/routes";
+import { ImageSymptomForm } from "@/components/symptom/ImageSymptomForm";
 
 export default function SymptomAnalysis() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { run, isLoading, error } = useApi(analyzeSymptoms);
+
+  // "text" | "photo" - which input mode is showing. Photo mode is a
+  // fully separate form (see ImageSymptomForm) since it hits a
+  // different endpoint (POST /analyze/image) with different required
+  // fields (nothing is strictly required there but the photo itself).
+  const [mode, setMode] = useState("text");
 
   // Saved Health Passport for the logged-in user, if any. Once this is
   // loaded, age/gender/existing conditions come from it automatically
@@ -31,6 +39,11 @@ export default function SymptomAnalysis() {
   const [duration, setDuration] = useState("");
   const [existingConditions, setExistingConditions] = useState("");
   const [formErrors, setFormErrors] = useState({});
+
+  const voiceInput = useVoiceInput({
+    onResult: (transcript) =>
+      setSymptoms((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript)),
+  });
 
   const fetchPassport = useCallback(async () => {
     if (!user) {
@@ -111,22 +124,71 @@ export default function SymptomAnalysis() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Symptom details</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>{mode === "text" ? "Symptom details" : "Photo analysis"}</CardTitle>
+            <div className="flex overflow-hidden rounded-md border border-border">
+              <button
+                type="button"
+                onClick={() => setMode("text")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${
+                  mode === "text" ? "bg-primary-light text-primary-dark" : "text-ink-soft"
+                }`}
+              >
+                <MessageSquareText className="size-3.5" /> Describe
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("photo")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${
+                  mode === "photo" ? "bg-primary-light text-primary-dark" : "text-ink-soft"
+                }`}
+              >
+                <Camera className="size-3.5" /> Photo
+              </button>
+            </div>
+          </div>
           <CardDescription>
-            {usingSavedProfile
-              ? "Just describe what's going on — your profile details are already saved."
-              : "All fields except existing conditions are required."}
+            {mode === "photo"
+              ? "Upload a photo of a visible symptom - a rash, wound, swelling, or similar."
+              : usingSavedProfile
+                ? "Just describe what's going on — your profile details are already saved."
+                : "All fields except existing conditions are required."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoadingPassport ? (
+          {mode === "photo" ? (
+            <ImageSymptomForm />
+          ) : isLoadingPassport ? (
             <div className="flex items-center justify-center py-10 text-ink-faint">
               <Spinner size={20} />
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="space-y-1.5">
-                <Label htmlFor="symptoms">Symptoms</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="symptoms">Symptoms</Label>
+                  {voiceInput.isSupported && (
+                    <button
+                      type="button"
+                      onClick={voiceInput.isListening ? voiceInput.stop : voiceInput.start}
+                      className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
+                        voiceInput.isListening
+                          ? "bg-danger-light text-danger"
+                          : "text-primary hover:bg-primary-light"
+                      }`}
+                    >
+                      {voiceInput.isListening ? (
+                        <>
+                          <MicOff className="size-3.5" /> Listening…
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="size-3.5" /> Speak
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
                 <Textarea
                   id="symptoms"
                   placeholder="e.g. Chest pain and sweating"
@@ -134,6 +196,7 @@ export default function SymptomAnalysis() {
                   onChange={(e) => setSymptoms(e.target.value)}
                   maxLength={1000}
                 />
+                {voiceInput.error && <p className="text-xs text-danger">{voiceInput.error}</p>}
                 {formErrors.symptoms && (
                   <p className="flex items-center gap-1.5 text-xs text-danger">
                     <AlertCircle className="size-3.5" /> {formErrors.symptoms}

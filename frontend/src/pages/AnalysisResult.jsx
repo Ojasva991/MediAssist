@@ -49,6 +49,8 @@ export default function AnalysisResult() {
     retrieved_guidance: retrievedGuidance = [],
     llm_severity: llmSeverity,
     history_id: historyId,
+    visual_observation: visualObservation,
+    image_rejected: imageRejected,
   } = result;
 
   const severityWasEscalated = llmSeverity && llmSeverity !== severity;
@@ -104,6 +106,27 @@ export default function AnalysisResult() {
         </div>
         <SeverityBadge severity={severity} />
       </div>
+
+      {visualObservation && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">What the AI observed in your photo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-ink-soft">{visualObservation}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {imageRejected && (
+        <Card className="border-warning/30 bg-warning-light">
+          <CardContent className="p-4 text-sm text-warning">
+            This looks like a medical scan or document rather than a photo of a visible
+            symptom. Please have it reviewed by the doctor who ordered it or a specialist -
+            general AI photo analysis isn't appropriate for interpreting scans/reports.
+          </CardContent>
+        </Card>
+      )}
 
       {conditions.length > 0 && (
         <Card>
