@@ -46,6 +46,49 @@ def test_signup_rejects_short_password(client):
     assert resp.status_code == 422
 
 
+def test_signup_rejects_known_disposable_email_domain(client):
+    resp = client.post(
+        "/auth/signup",
+        json={
+            "name": "Ada",
+            "email": f"user-{uuid.uuid4().hex[:8]}@mailinator.com",
+            "password": "password123",
+        },
+    )
+    assert resp.status_code == 422
+    assert "disposable" in resp.json()["detail"][0]["msg"].lower()
+
+
+def test_signup_rejects_disposable_domain_case_insensitively(client):
+    resp = client.post(
+        "/auth/signup",
+        json={
+            "name": "Ada",
+            "email": f"user-{uuid.uuid4().hex[:8]}@MAILINATOR.COM",
+            "password": "password123",
+        },
+    )
+    assert resp.status_code == 422
+
+
+def test_signup_rejects_email_missing_tld(client):
+    resp = client.post(
+        "/auth/signup",
+        json={"name": "Ada", "email": "user@localhost", "password": "password123"},
+    )
+    assert resp.status_code == 422
+
+
+def test_signup_accepts_ordinary_email_domain(client):
+    # Sanity check the blocklist/regex additions don't reject legitimate
+    # addresses - a real domain that isn't on the disposable list.
+    resp = client.post(
+        "/auth/signup",
+        json={"name": "Ada", "email": _unique_email(), "password": "password123"},
+    )
+    assert resp.status_code == 201
+
+
 def test_same_email_always_derives_same_user_id(client):
     # Deterministic user_id (sha256 of lowercased/trimmed email) - same
     # email must always map to the same user_id.

@@ -5,7 +5,17 @@ Kept separate from app/models/passport.py since these represent a
 different concern (identity) from the medical data itself.
 """
 
+import re
+
 from pydantic import BaseModel, Field, field_validator
+
+from app.auth.disposable_domains import is_disposable_email
+
+# Deliberately a bit stricter than "has an @ and a dot" (the old check) -
+# still permissive of real-world addresses (plus-addressing, subdomains,
+# etc.), just rejects obviously-malformed input rather than a proper
+# RFC 5322 parser, which is overkill here.
+_EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 
 class UserSignup(BaseModel):
@@ -19,8 +29,16 @@ class UserSignup(BaseModel):
     @classmethod
     def normalize_email(cls, v: str) -> str:
         v = v.strip().lower()
-        if "@" not in v or "." not in v.split("@")[-1]:
+        if not _EMAIL_PATTERN.match(v):
             raise ValueError("Enter a valid email address")
+        if is_disposable_email(v):
+            # Best-effort only - see app/auth/disposable_domains.py's
+            # scope note. This blocks the common/obvious cases, it is
+            # not full email verification.
+            raise ValueError(
+                "Please use a real, non-disposable email address. "
+                "Temporary/throwaway email providers aren't accepted."
+            )
         return v
 
 
