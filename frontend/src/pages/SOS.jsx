@@ -14,6 +14,7 @@ import { SosInfoSkeleton } from "@/components/sos/SosInfoSkeleton";
 import { useAuth } from "@/context/AuthContext";
 import { getPassport } from "@/api/passport";
 import { getNearbyHospitals } from "@/api/emergency";
+import { HospitalsMap } from "@/components/sos/HospitalsMap";
 import { ROUTES } from "@/constants/routes";
 
 const EMERGENCY_NUMBER = "112"; // India's unified emergency number
@@ -50,6 +51,7 @@ export default function SOS() {
   const [hospitals, setHospitals] = useState([]);
   const [hospitalError, setHospitalError] = useState(null);
   const [lastCoords, setLastCoords] = useState(null); // { lat, lon } - set as soon as geolocation succeeds, independent of Overpass's outcome
+  const [hospitalView, setHospitalView] = useState("list"); // "list" | "map"
 
   const findNearbyHospitals = useCallback(() => {
     if (!("geolocation" in navigator)) {
@@ -179,9 +181,33 @@ export default function SOS() {
             </Button>
           )}
           {hospitalState === "done" && (
-            <Button size="sm" variant="ghost" onClick={findNearbyHospitals}>
-              <RefreshCcw className="size-3.5" /> Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {hospitals.length > 0 && (
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  <button
+                    type="button"
+                    onClick={() => setHospitalView("list")}
+                    className={`px-2.5 py-1 text-xs font-medium ${
+                      hospitalView === "list" ? "bg-primary-light text-primary-dark" : "text-ink-soft"
+                    }`}
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHospitalView("map")}
+                    className={`px-2.5 py-1 text-xs font-medium ${
+                      hospitalView === "map" ? "bg-primary-light text-primary-dark" : "text-ink-soft"
+                    }`}
+                  >
+                    Map
+                  </button>
+                </div>
+              )}
+              <Button size="sm" variant="ghost" onClick={findNearbyHospitals}>
+                <RefreshCcw className="size-3.5" /> Refresh
+              </Button>
+            </div>
           )}
         </div>
 
@@ -195,7 +221,13 @@ export default function SOS() {
           </p>
         )}
 
-        {hospitalState === "done" && hospitals.length > 0 && (
+        {hospitalState === "done" && hospitals.length > 0 && hospitalView === "map" && lastCoords && (
+          <div className="mt-4">
+            <HospitalsMap userLat={lastCoords.lat} userLon={lastCoords.lon} hospitals={hospitals} />
+          </div>
+        )}
+
+        {hospitalState === "done" && hospitals.length > 0 && hospitalView === "list" && (
           <ul className="mt-4 space-y-3">
             {hospitals.map((h, i) => (
               <li
