@@ -8,5 +8,6 @@ export const ROUTES = {
   PASSPORT: "/passport",
   HISTORY: "/history",
   REMINDERS: "/reminders",
+  DRUG_INTERACTIONS: "/drug-interactions",
   SOS: "/sos",
 };

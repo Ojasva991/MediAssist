@@ -13,6 +13,7 @@ import AnalysisResult from "@/pages/AnalysisResult";
 import Passport from "@/pages/Passport";
 import History from "@/pages/History";
 import Reminders from "@/pages/Reminders";
+import DrugInteractions from "@/pages/DrugInteractions";
 import SOS from "@/pages/SOS";
 import NotFound from "@/pages/NotFound";
 
@@ -33,6 +34,7 @@ export default function App() {
               <Route path={ROUTES.PASSPORT} element={<Passport />} />
               <Route path={ROUTES.HISTORY} element={<History />} />
               <Route path={ROUTES.REMINDERS} element={<Reminders />} />
+              <Route path={ROUTES.DRUG_INTERACTIONS} element={<DrugInteractions />} />
               <Route path={ROUTES.SOS} element={<SOS />} />
             </Route>
 

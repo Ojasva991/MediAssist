@@ -7,7 +7,7 @@
 > deciding what to work on — it should be enough to re-orient cheaply.
 
 **Last Updated:** 2026-07-28 (voice input + photo symptom analysis + AI
-gateway with Groq fallback — see Section 6)
+gateway with Groq fallback + drug interaction checker — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -197,6 +197,32 @@ trusted from a prior write-up.
   just a decision). Both could be added later following the exact same
   pattern as Groq in `gateway.py`, if/when those decisions are made.
 
+- **Drug interaction checker (done, pushed) - deliberately small scope,
+  purely deterministic, no AI call at all:** `POST
+  /drug-interactions/check` (public, no login required). Researched
+  first, per usual practice here: NLM's official Drug-Drug Interaction
+  API was discontinued in January 2024 (confirmed, not a rumor) and
+  DrugBank's free checker is being retired March 25, 2026 - there is
+  currently no live, free, official pairwise interaction API to call.
+  The realistic broad-coverage option is DDInter 2.0 (302,516 records,
+  but CC BY-NC-SA 4.0 - same non-commercial licensing question already
+  open for the WHO RAG sources) - that's a much bigger data-engineering
+  project (download, parse, host, build name resolution), explicitly
+  NOT done this round. What got built instead: `app/interactions/corpus.py`,
+  a hand-written list of ~34 well-established, textbook-level
+  interactions (anticoagulants, SSRIs/MAOIs, cardiac drugs, diuretics,
+  NSAIDs, a few antibiotics/antifungals, one herbal supplement) checked
+  via exact case-insensitive name/alias matching - no fuzzy matching, no
+  AI-assisted name resolution, and **no AI call anywhere in this
+  feature** - same "an LLM sounding confident while being wrong is a
+  real harm here" reasoning as the rule engine's severity floor. A
+  drug pair not in this list is NOT reported as safe - the response
+  and disclaimer are explicit that "not flagged" means "not checked
+  against a real database," not "confirmed fine." If DDInter ingestion
+  is wanted later, `app/interactions/matcher.py`'s lookup shape
+  (canonical name + aliases, frozenset-keyed pair index) would extend
+  naturally to a much bigger dataset without a redesign.
+
 ---
 
 ## 2. What's next — in priority order
@@ -326,3 +352,13 @@ preserved in git history; summarized under Section 1 above.)*
   the same "new paid infra/hosting decision" reasoning used throughout
   this file, not built as fakes or stubs. Gateway scoped to the text
   `/analyze` path only, not image analysis - see Section 1 for why.
+  Picked up the drug interaction checker next from the backlog.
+  Researched real data-source availability first (NLM's official API
+  discontinued Jan 2024; DrugBank's free checker retiring March 2026;
+  DDInter 2.0 is the real broad-coverage option but is a 300K+ record
+  downloadable dataset under CC BY-NC-SA, not a live API - too big for
+  this round). User chose the smaller scope: a ~34-entry hand-curated
+  list of well-established interactions, checked deterministically
+  (exact name/alias matching, zero AI calls) - same reasoning as the
+  rule engine's severity floor about not trusting an LLM to freely
+  generate claims in a domain where being wrong is a real harm.

@@ -59,6 +59,9 @@ class Settings:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+    # Public, deterministic (no AI call) - see app/interactions/matcher.py.
+    RATE_LIMIT_DRUG_INTERACTIONS: str = os.getenv("RATE_LIMIT_DRUG_INTERACTIONS", "20/minute")
+
     # OpenStreetMap's Overpass API - no key/billing account needed.
     # See app/emergency/hospital_lookup.py for why this was chosen over
     # a paid places API.
