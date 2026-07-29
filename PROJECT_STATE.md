@@ -6,8 +6,8 @@
 > back up after a gap, read only this file (not the whole codebase) before
 > deciding what to work on — it should be enough to re-orient cheaply.
 
-**Last Updated:** 2026-07-28 (hospitals map + reminders + disposable-email
-blocking — see Section 6)
+**Last Updated:** 2026-07-28 (voice input + photo symptom analysis + AI
+gateway with Groq fallback — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -144,6 +144,59 @@ trusted from a prior write-up.
   this project doesn't have - see the backlog entry below for the
   actual provider research done on that decision).
 
+- **Voice input for symptoms (done, pushed):** a "Speak" button next to
+  the Symptoms field on the Symptom Analysis page, using the browser's
+  built-in Web Speech API. No backend, no new dependency, no cost -
+  feature-detected and hidden in browsers that don't support it
+  (Firefox, mostly).
+
+- **Photo-based visual symptom analysis (done, pushed) - a genuinely
+  higher-stakes feature, built with extra guardrails, not a casual
+  add-on:** new "Photo" tab on Symptom Analysis, `POST /analyze/image`.
+  Uses Gemini's multimodal (vision) capability - same model, no new
+  provider. Key safety decisions, worth remembering if this code is
+  touched again:
+  - A **separate, stricter system prompt** (`IMAGE_SYSTEM_PROMPT` in
+    `app/ai/prompts.py`) than text analysis - explicitly forbids
+    reassuring language ("looks benign", "probably fine") for anything
+    resembling a skin lesion/mole/wound, since false reassurance on a
+    photo is a worse failure mode than a text tool getting severity
+    wrong.
+  - **Medical scans (X-ray/CT/MRI/lab reports) are explicitly out of
+    scope** - the AI is instructed to decline interpreting those
+    (`image_rejected: true`) and point to the ordering doctor/a
+    radiologist, rather than attempt general-vision interpretation of
+    actual medical imaging.
+  - Every response includes `visual_observation` - what the AI actually
+    saw, in plain language, so the person can confirm it looked at the
+    right thing.
+  - A mandatory extra disclaimer sentence about photo unreliability is
+    enforced in code (not just requested in the prompt) - defense in
+    depth, same pattern as emergency-number scrubbing elsewhere.
+  - Real bug caught during testing: the shared `analysis_history` table
+    requires age+gender NOT NULL, but this endpoint allows a photo with
+    zero patient info - fixed by skipping the history save gracefully
+    in that case (logged, not crashed, not faked with placeholder
+    data).
+
+- **AI Gateway with Groq fallback (done, pushed) - text `/analyze` path
+  only:** `app/ai/gateway.py` tries Gemini first, then Groq (free, no
+  credit card, OpenAI-compatible API) if Gemini fails, before the
+  caller falls through to the existing rule-engine-only fallback. Same
+  "try several, then a guaranteed fallback" shape as the Overpass
+  nearby-hospitals lookup, applied to the AI layer. Groq is skipped
+  entirely (not an error) if `GROQ_API_KEY` isn't set - the app must
+  keep working with just Gemini configured. **Deliberately does NOT
+  cover `/analyze/image`** - Groq's vision-model lineup wasn't verified
+  as a safe drop-in for the same conservative image-analysis prompt,
+  so image analysis still calls Gemini directly. Researched but NOT
+  added as providers: OpenAI (free tier gone since mid-2025, needs
+  prepaid billing - a new paid-infra decision) and Ollama (needs a
+  dedicated server actually running the model - Render's free tier
+  can't host this at all, a different infrastructure category, not
+  just a decision). Both could be added later following the exact same
+  pattern as Groq in `gateway.py`, if/when those decisions are made.
+
 ---
 
 ## 2. What's next — in priority order
@@ -255,3 +308,21 @@ preserved in git history; summarized under Section 1 above.)*
   version now: a disposable/throwaway-email domain blocklist at signup,
   explicitly documented as best-effort rather than real verification.
   Logged SMS reminders as a separate deferred paid-infra decision.
+- 2026-07-28 (continued): Built voice input for symptoms (Web Speech
+  API, client-side only). Built photo-based visual symptom analysis
+  (`POST /analyze/image`) with deliberately stricter safety guardrails
+  than text analysis - a separate conservative system prompt, explicit
+  refusal to interpret medical scans, a visual_observation field so the
+  person can verify what the AI actually saw, and a code-enforced extra
+  disclaimer about photo unreliability. Caught and fixed a real bug
+  where the shared history table's NOT NULL age/gender columns didn't
+  account for this endpoint's "photo with zero context" case. User then
+  referenced an idea from an architecture doc they'd written separately
+  (multi-provider AI gateway with cascading fallback - Gemini → Groq →
+  OpenAI → Ollama → rule engine). Researched current reality on all
+  four: Groq is genuinely free/no-card and was added as a real second
+  provider; OpenAI (free tier gone, needs billing) and Ollama (needs a
+  dedicated server, Render free tier can't run it) were deferred with
+  the same "new paid infra/hosting decision" reasoning used throughout
+  this file, not built as fakes or stubs. Gateway scoped to the text
+  `/analyze` path only, not image analysis - see Section 1 for why.

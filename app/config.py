@@ -52,6 +52,13 @@ class Settings:
     # request. See app/routes/analyze.py.
     RATE_LIMIT_ANALYZE_IMAGE: str = os.getenv("RATE_LIMIT_ANALYZE_IMAGE", "5/minute")
 
+    # Second AI provider for the gateway's fallback chain (see
+    # app/ai/gateway.py) - free, no credit card. Empty by default:
+    # the gateway skips Groq entirely (not an error) if this isn't
+    # set, so the app keeps working with just Gemini configured.
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
     # OpenStreetMap's Overpass API - no key/billing account needed.
     # See app/emergency/hospital_lookup.py for why this was chosen over
     # a paid places API.

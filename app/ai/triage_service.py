@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from app.ai.fallback import build_fallback_response
 from app.ai.gemini_client import gemini_client, GeminiClientError
+from app.ai.gateway import generate as ai_gateway_generate, AIGatewayError
 from app.ai.prompts import (
     IMAGE_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
@@ -145,9 +146,9 @@ def analyze_symptoms(request: SymptomAnalysisRequest) -> SymptomAnalysisResponse
     user_prompt = build_analysis_prompt(request, guidance_entries)
 
     try:
-        raw_text = gemini_client.generate(SYSTEM_PROMPT, user_prompt)
-    except GeminiClientError as e:
-        logger.error("Gemini call failed, using fallback: %s", e)
+        raw_text = ai_gateway_generate(SYSTEM_PROMPT, user_prompt)
+    except AIGatewayError as e:
+        logger.error("All AI providers failed, using fallback: %s", e)
         return build_fallback_response(request)
 
     try:
