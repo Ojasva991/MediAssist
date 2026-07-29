@@ -196,6 +196,13 @@ export default function SymptomAnalysis() {
                   onChange={(e) => setSymptoms(e.target.value)}
                   maxLength={1000}
                 />
+                <p className="text-xs text-ink-faint">
+                  You can describe your symptoms in any language and the AI will reply in kind -
+                  but our automatic red-flag safety checks currently only recognize English
+                  wording. If you're writing in another language and anything feels urgent,
+                  please still use the SOS page or contact emergency services directly rather
+                  than relying on this alone.
+                </p>
                 {voiceInput.error && <p className="text-xs text-danger">{voiceInput.error}</p>}
                 {formErrors.symptoms && (
                   <p className="flex items-center gap-1.5 text-xs text-danger">

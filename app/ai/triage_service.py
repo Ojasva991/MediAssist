@@ -22,9 +22,12 @@ from app.ai.gateway import generate as ai_gateway_generate, AIGatewayError
 from app.ai.prompts import (
     IMAGE_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
+    FOLLOWUP_SYSTEM_PROMPT,
     build_analysis_prompt,
     build_image_analysis_prompt,
+    build_follow_up_prompt,
 )
+from app.models.followup import FollowUpResponse
 from app.models.symptom import (
     GuidanceReference,
     RuleEngineFindings,
@@ -50,9 +53,16 @@ DEFAULT_DISCLAIMER = (
 # layer that scrubs any such number out if it slips through anyway - a
 # wrong number in a medical emergency is not an acceptable failure mode.
 _WRONG_EMERGENCY_NUMBER_PATTERN = re.compile(
-    r"\b(?:call|dial|contact)\s+(?:the\s+)?(?:number\s+)?"
-    r"(911|999|000|111|119|110|999|112 or 911)\b",
-    re.IGNORECASE,
+    # Deliberately NOT anchored to English verbs like "call"/"dial" -
+    # this needs to catch these numbers regardless of what language
+    # surrounds them (e.g. "llama al 911", "911 पर कॉल करें"), since the
+    # multilingual assistant (see app/ai/prompts.py) can respond in any
+    # language the person used. These specific numbers are unlikely to
+    # appear in medical triage text for any other reason, so matching
+    # them as bare tokens - not just after specific English verbs - is
+    # the safer tradeoff: a rare false positive here costs nothing, a
+    # missed wrong number in a real emergency costs a lot.
+    r"\b(911|999|000|111|119|110)\b"
 )
 _GENERIC_REPLACEMENT = "contact your local emergency number"
 
@@ -329,3 +339,114 @@ def analyze_image(
             data,
         )
         return build_fallback_response(rule_engine_request)
+
+
+def _follow_up_fallback(rule_result) -> FollowUpResponse:
+    """
+    Safe, conservative reply when the AI gateway is unavailable for a
+    follow-up message - based purely on the deterministic rule engine,
+    same reasoning as build_fallback_response for the main analysis.
+    Never leaves someone without guidance just because every AI
+    provider failed.
+    """
+    if rule_result.sos_recommended or rule_result.severity == Severity.EMERGENCY:
+        reply = (
+            "I'm having trouble processing your message right now, but based on what you've "
+            "described, please treat this as urgent - use the SOS button or contact your local "
+            "emergency number rather than waiting for a chat response."
+        )
+    else:
+        reply = (
+            "I'm having trouble processing your message right now. If your symptoms are "
+            "getting worse or you're worried, please contact a healthcare professional or use "
+            "the app's SOS page rather than waiting on this chat."
+        )
+    return FollowUpResponse(
+        reply=reply,
+        severity=rule_result.severity.value,
+        escalation_detected=False,
+        sos_recommended=rule_result.sos_recommended,
+        disclaimer=DEFAULT_DISCLAIMER,
+    )
+
+
+def answer_follow_up(
+    original_symptoms: str, conversation: list[dict], message: str
+) -> FollowUpResponse:
+    """
+    Answers one follow-up chat message in a conversation attached to an
+    earlier analysis (see POST /analyze/follow-up).
+
+    The deterministic rule engine re-runs here over the FULL
+    conversation text (original symptoms + every prior user message +
+    this new one) - not just the AI's own judgment - so a red-flag
+    phrase raised mid-conversation still raises the severity floor even
+    if the AI's own "escalation_detected" call is wrong. Same "AI can't
+    downgrade below the rule engine's floor" guarantee as the original
+    analysis in analyze_symptoms() above.
+
+    Stateless - no chat history is persisted here (see
+    app/models/followup.py's scope note). Goes through the same AI
+    gateway (Gemini -> Groq) as text analysis.
+    """
+    combined_text = " ".join(
+        [original_symptoms]
+        + [turn.get("content", "") for turn in conversation if turn.get("role") == "user"]
+        + [message]
+    )
+    rule_engine_request = SymptomAnalysisRequest(
+        age=None,
+        gender=None,
+        symptoms=(combined_text.strip() or "No description provided.")[:1000],
+        duration="Not specified",
+        existing_conditions=None,
+    )
+    rule_result = evaluate_rules(rule_engine_request)
+
+    user_prompt = build_follow_up_prompt(conversation, message)
+
+    try:
+        raw_text = ai_gateway_generate(FOLLOWUP_SYSTEM_PROMPT, user_prompt)
+    except AIGatewayError as e:
+        logger.error("All AI providers failed for follow-up, using safe fallback: %s", e)
+        return _follow_up_fallback(rule_result)
+
+    try:
+        data = _parse_gemini_json(raw_text)
+    except TriageServiceError as e:
+        logger.error("Follow-up JSON parsing failed, using safe fallback: %s", e)
+        return _follow_up_fallback(rule_result)
+
+    data.setdefault("disclaimer", DEFAULT_DISCLAIMER)
+    if isinstance(data.get("reply"), str):
+        data["reply"] = _sanitize_emergency_number(data["reply"])
+    if isinstance(data.get("disclaimer"), str):
+        data["disclaimer"] = _sanitize_emergency_number(data["disclaimer"])
+
+    llm_severity_raw = data.get("severity")
+    if llm_severity_raw in ("LOW", "MODERATE", "HIGH", "EMERGENCY"):
+        llm_severity_enum = Severity(llm_severity_raw)
+        reconciled_severity = more_urgent(rule_result.severity, llm_severity_enum)
+    else:
+        llm_severity_enum = None
+        reconciled_severity = rule_result.severity
+
+    data["severity"] = reconciled_severity.value
+    data["sos_recommended"] = bool(data.get("sos_recommended")) or rule_result.sos_recommended
+
+    # If the rule engine's floor forced severity UP beyond what the AI
+    # itself reported, that's an escalation regardless of the AI's own
+    # "escalation_detected" flag - defense in depth, don't just trust
+    # the model noticed.
+    if llm_severity_enum is not None and reconciled_severity != llm_severity_enum:
+        data["escalation_detected"] = True
+    else:
+        data["escalation_detected"] = bool(data.get("escalation_detected", False))
+
+    try:
+        return FollowUpResponse(**data)
+    except ValidationError as e:
+        logger.error(
+            "Follow-up JSON didn't match expected schema, using fallback: %s | data=%s", e, data
+        )
+        return _follow_up_fallback(rule_result)

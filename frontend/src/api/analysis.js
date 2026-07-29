@@ -35,6 +35,21 @@ export async function analyzeSymptoms(payload) {
 }
 
 /**
+ * POST /analyze/follow-up - stateless, no auth required. Send the full
+ * conversation every time; nothing is remembered server-side. See
+ * app/models/followup.py for the response shape (includes
+ * escalation_detected - show this prominently, don't bury it).
+ */
+export async function askFollowUp({ originalSymptoms, conversation, message }) {
+  const { data } = await apiClient.post("/analyze/follow-up", {
+    original_symptoms: originalSymptoms,
+    conversation,
+    message,
+  });
+  return data;
+}
+
+/**
  * POST /analyze/image (multipart/form-data)
  *
  * `image` is a File/Blob. All other fields optional - a photo can be

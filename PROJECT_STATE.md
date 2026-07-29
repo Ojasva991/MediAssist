@@ -7,7 +7,8 @@
 > deciding what to work on — it should be enough to re-orient cheaply.
 
 **Last Updated:** 2026-07-28 (voice input + photo symptom analysis + AI
-gateway with Groq fallback + drug interaction checker — see Section 6)
+gateway with Groq fallback + drug interaction checker + multilingual
+follow-up chat — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -223,6 +224,36 @@ trusted from a prior write-up.
   (canonical name + aliases, frozenset-keyed pair index) would extend
   naturally to a much bigger dataset without a redesign.
 
+- **Multilingual responses + follow-up chat (done, pushed):**
+  - **Safety prerequisite fixed first, not after:** the emergency-number
+    scrubber (`_sanitize_emergency_number` in `app/ai/triage_service.py`)
+    was English-verb-anchored (`call|dial|contact` + a number) - a wrong
+    number stated in another language would have slipped straight
+    through. Broadened to match the bare number regardless of
+    surrounding language, with a regression test proving it (Spanish
+    phrasing case).
+  - Both system prompts (text + image) now instruct the AI to respond
+    in whatever language the person used.
+  - **Honest, UI-visible caveat, not just a code comment:** the
+    deterministic rule-engine safety floor is still English-keyword-
+    only (`chest pain`, `difficulty breathing`, etc.). Responding in
+    another language does NOT extend that floor - this is stated
+    directly on the Symptom Analysis page and in the follow-up chat
+    itself, not buried.
+  - **Follow-up chat** (`POST /analyze/follow-up`, stateless - no chat
+    history persisted server-side, frontend holds the conversation in
+    React state and resends it each time): the rule engine re-runs over
+    the ENTIRE conversation (original symptoms + every message
+    exchanged, not just the latest one) on every turn, so a red flag
+    raised mid-conversation still forces the severity floor up
+    independent of the AI's own judgment - tested explicitly, including
+    the case where the red flag is in an earlier turn, not the newest
+    message. `escalation_detected` is forced true whenever the rule
+    engine's floor exceeds what the AI itself reported, same defense-
+    in-depth pattern as `sos_recommended` elsewhere in this codebase.
+    Goes through the same Gemini→Groq gateway as text analysis; has its
+    own safe, rule-engine-only fallback wording if both providers fail.
+
 ---
 
 ## 2. What's next — in priority order
@@ -252,16 +283,15 @@ trusted from a prior write-up.
 4. **SMS reminders** - same kind of decision as above but for SMS (a
    provider like Twilio, with a phone number and real per-message cost).
    Explicitly deferred, not started, not decided on.
-5. Remaining backlog, unsequenced: drug interaction checker (needs careful
-   sourcing/disclaiming), offline-first PWA for SOS (would also be what
-   makes real push notifications for reminders possible, see Section 1),
-   voice input, caregiver/family mode, wearable data import,
-   emergency-flow additions beyond hospitals (e.g. showing the user's own
-   emergency contact's live ETA - same "needs something real behind it"
-   caveat as ambulance tracking above), AI assistant (follow-ups,
-   multilingual), Redis/Docker/JWT hardening/real role-based access
-   control (would also let the `/rag-review` admin gate stop being an
-   env-var stopgap), admin analytics dashboard.
+5. Remaining backlog, unsequenced: offline-first PWA for SOS (would
+   also be what makes real push notifications for reminders possible,
+   see Section 1), caregiver/family mode, wearable data import,
+   emergency-flow additions beyond hospitals (e.g. showing the user's
+   own emergency contact's live ETA - same "needs something real behind
+   it" caveat as ambulance tracking above), Redis/Docker/JWT
+   hardening/real role-based access control (would also let the
+   `/rag-review` admin gate stop being an env-var stopgap), admin
+   analytics dashboard.
 
 ## 3. Key gotchas (don't relearn these the hard way)
 
@@ -362,3 +392,16 @@ preserved in git history; summarized under Section 1 above.)*
   (exact name/alias matching, zero AI calls) - same reasoning as the
   rule engine's severity floor about not trusting an LLM to freely
   generate claims in a domain where being wrong is a real harm.
+  Picked up "AI assistant (follow-ups, multilingual)" last. Scoped it
+  via clarifying questions first: follow-ups meant a real chat thread
+  (not just re-running analysis), multilingual meant auto-detect from
+  what the person types. Found and fixed a real safety gap before
+  building anything else: the emergency-number scrubber was English-
+  verb-anchored and would have let a wrong number through in another
+  language - broadened it first, with a regression test. Then added
+  the language instruction to both system prompts, built the follow-up
+  chat endpoint (stateless, rule engine re-checks the WHOLE conversation
+  every turn so a red flag doesn't need to be in the latest message to
+  be caught), and added an honest, UI-visible caveat (not just a code
+  comment) that the rule-engine safety net itself is still English-only
+  even though the AI's replies aren't.

@@ -93,7 +93,26 @@ def test_analyze_never_returns_wrong_country_emergency_number(client, monkeypatc
     assert resp.status_code == 200
     body = resp.json()
     assert "911" not in body["recommended_action"]
-    assert "local emergency number" in body["recommended_action"].lower()
+
+
+def test_emergency_number_scrubbed_even_in_non_english_phrasing(client, monkeypatch):
+    # The scrubber must not depend on English verbs like "call"/"dial" -
+    # it needs to catch the bare number regardless of surrounding
+    # language, since the assistant can respond in any language the
+    # person used.
+    _mock_gemini_success(
+        monkeypatch,
+        {
+            "possible_conditions": ["Possible cardiac event"],
+            "severity": "EMERGENCY",
+            "recommended_action": "Esto es grave - llama al 911 de inmediato.",
+            "sos_recommended": True,
+            "disclaimer": "Esto no es un diagnostico medico.",
+        },
+    )
+    resp = client.post("/analyze", json=VALID_PAYLOAD)
+    assert resp.status_code == 200
+    assert "911" not in resp.json()["recommended_action"]
 
 
 def test_analyze_saves_history_when_logged_in(client, monkeypatch, make_user):

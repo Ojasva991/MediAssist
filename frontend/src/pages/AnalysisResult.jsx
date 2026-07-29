@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { submitAnalysisFeedback } from "@/api/history";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/constants/routes";
+import { FollowUpChat } from "@/components/symptom/FollowUpChat";
 
 export default function AnalysisResult() {
   const location = useLocation();
@@ -229,6 +230,8 @@ export default function AnalysisResult() {
       <p className="rounded-[var(--radius-control)] bg-[var(--color-mist)] p-4 text-xs leading-relaxed text-ink-faint">
         {disclaimer}
       </p>
+
+      <FollowUpChat originalSymptoms={payload?.symptoms || "Not provided"} />
 
       <Button
         variant="outline"

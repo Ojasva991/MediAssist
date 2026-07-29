@@ -14,9 +14,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
-from app.ai.triage_service import analyze_image, analyze_symptoms
+from app.ai.triage_service import analyze_image, analyze_symptoms, answer_follow_up
 from app.auth.dependencies import get_optional_user_id
 from app.config import settings
+from app.models.followup import FollowUpRequest, FollowUpResponse
 from app.models.symptom import (
     SymptomAnalysisRequest,
     SymptomAnalysisResponse,
@@ -311,3 +312,33 @@ async def analyze_image_route(
             )
 
     return result
+
+
+@router.post(
+    "/analyze/follow-up",
+    response_model=FollowUpResponse,
+    summary="Ask a Follow-Up Question About an Analysis",
+    description="""
+Continue a conversation about an earlier symptom analysis - "why is this
+serious?", "what if I also have X?", and similar.
+
+Stateless: send the full conversation each time (see FollowUpRequest) -
+nothing is remembered server-side between calls.
+
+The deterministic rule engine re-runs over the WHOLE conversation
+(original symptoms + every message exchanged) on every call - if
+something you describe mid-conversation is a known red flag, the
+severity floor rises regardless of what the AI itself concludes, same
+as the original analysis endpoint.
+
+⚠️ Same disclaimers as POST /analyze apply - this is informational only,
+not a diagnosis, and not a substitute for professional care.
+""",
+)
+@limiter.limit(settings.RATE_LIMIT_ANALYZE)
+def follow_up_route(request: Request, payload: FollowUpRequest) -> FollowUpResponse:
+    return answer_follow_up(
+        original_symptoms=payload.original_symptoms,
+        conversation=[turn.model_dump() for turn in payload.conversation],
+        message=payload.message,
+    )
