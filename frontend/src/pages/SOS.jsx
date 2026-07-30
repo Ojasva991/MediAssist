@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode, MapPin, Navigation, LocateFixed, ExternalLink } from "lucide-react";
+import { Phone, ShieldAlert, Droplet, Pill, HeartPulse, ArrowLeft, RefreshCcw, QrCode, MapPin, Navigation, LocateFixed, ExternalLink, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getPassport } from "@/api/passport";
 import { getNearbyHospitals } from "@/api/emergency";
 import { HospitalsMap } from "@/components/sos/HospitalsMap";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { ROUTES } from "@/constants/routes";
 
 const EMERGENCY_NUMBER = "112"; // India's unified emergency number
@@ -41,6 +42,7 @@ function buildEmergencyCardText(passport) {
 
 export default function SOS() {
   const { user } = useAuth();
+  const isOnline = useOnlineStatus();
   const [passport, setPassport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,6 +56,14 @@ export default function SOS() {
   const [hospitalView, setHospitalView] = useState("list"); // "list" | "map"
 
   const findNearbyHospitals = useCallback(() => {
+    if (!isOnline) {
+      setHospitalState("error");
+      setHospitalError(
+        "You're offline - hospital search needs an internet connection. Your Google Maps link " +
+          "below and emergency call buttons above still work without one."
+      );
+      return;
+    }
     if (!("geolocation" in navigator)) {
       setHospitalState("error");
       setHospitalError("Location isn't available on this device or browser.");
@@ -85,7 +95,7 @@ export default function SOS() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, []);
+  }, [isOnline]);
 
   // Zero-backend, zero-API-key fallback: a plain Google Maps search URL.
   // Works even if every Overpass mirror is down, since it's just a link -
@@ -283,6 +293,13 @@ export default function SOS() {
 
       {/* Critical info at a glance */}
       <div>
+        {!isOnline && (
+          <div className="mb-3 flex items-center gap-2 rounded-[var(--radius-control)] bg-warning-light px-3 py-2 text-xs text-warning">
+            <WifiOff className="size-3.5 shrink-0" />
+            You're offline. Emergency calls and your saved info below still work - hospital
+            search needs a connection.
+          </div>
+        )}
         <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-ink-faint">
           Show this to first responders
         </h2>

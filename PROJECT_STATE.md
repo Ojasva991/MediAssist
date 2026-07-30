@@ -6,9 +6,7 @@
 > back up after a gap, read only this file (not the whole codebase) before
 > deciding what to work on — it should be enough to re-orient cheaply.
 
-**Last Updated:** 2026-07-28 (voice input + photo symptom analysis + AI
-gateway with Groq fallback + drug interaction checker + multilingual
-follow-up chat — see Section 6)
+**Last Updated:** 2026-07-30 (offline-first PWA for SOS — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -254,6 +252,46 @@ trusted from a prior write-up.
     Goes through the same Gemini→Groq gateway as text analysis; has its
     own safe, rule-engine-only fallback wording if both providers fail.
 
+- **Offline-first PWA for SOS (done, pushed):** the app is now
+  installable (manifest + generated icons from the existing pulse.svg
+  brand mark) and the SOS page specifically works with zero network
+  once visited. New frontend devDependency: `vite-plugin-pwa` (Workbox
+  under the hood) - a deliberate exception to this project's usual
+  "hand-roll it, avoid a new dependency" bias (see Overpass's plain-
+  urllib client for the normal default). Reasoning: correctly
+  precaching Vite's content-hashed build output and handling service-
+  worker update/versioning by hand is a well-known source of "PWA
+  silently serves broken stale UI" bugs - exactly the wrong risk to
+  take on for a page whose entire purpose is working reliably during
+  an emergency. `vite-plugin-pwa` is the standard, actively-maintained
+  solution in the Vite ecosystem itself, not a random third-party
+  library.
+  - **What's cached, and why - this was the actual safety-relevant
+    design decision, not the plugin choice:** the built app shell
+    (JS/CSS/HTML) is precached, so the whole SPA loads with no network.
+    The Health Passport GET specifically uses a NetworkFirst strategy
+    (try fresh data, fall back to last-cached response only when truly
+    offline) - that's what lets the SOS page's critical-info card
+    (name, blood group, allergies, emergency contact) render offline.
+  - **What's deliberately NEVER cached:** nearby-hospitals results and
+    every other API call (auth, analyze, history, reminders, drug
+    interactions, etc.) are NetworkOnly. Serving a stale hospital
+    location as if it were current during a real emergency is a worse
+    failure mode than just failing visibly - same "don't fabricate
+    certainty" reasoning as everywhere else safety-relevant in this
+    codebase. When offline, the SOS page shows a clear "you're offline,
+    hospital search needs a connection" message (checked proactively
+    before even attempting geolocation) rather than a confusing generic
+    error, plus a small banner reminding the person that emergency
+    calls and their saved info still work without a connection.
+  - `start_url` is set to `/sos` specifically - launching the installed
+    app from a home-screen icon goes straight to the most
+    time-critical page, not the dashboard.
+  - New: `frontend/src/hooks/useOnlineStatus.js` (native
+    online/offline browser events - noted honestly in its own
+    docstring that `navigator.onLine` means "network interface is up,"
+    not "internet is actually reachable," since it isn't a guarantee).
+
 ---
 
 ## 2. What's next — in priority order
@@ -283,12 +321,15 @@ trusted from a prior write-up.
 4. **SMS reminders** - same kind of decision as above but for SMS (a
    provider like Twilio, with a phone number and real per-message cost).
    Explicitly deferred, not started, not decided on.
-5. Remaining backlog, unsequenced: offline-first PWA for SOS (would
-   also be what makes real push notifications for reminders possible,
-   see Section 1), caregiver/family mode, wearable data import,
-   emergency-flow additions beyond hospitals (e.g. showing the user's
-   own emergency contact's live ETA - same "needs something real behind
-   it" caveat as ambulance tracking above), Redis/Docker/JWT
+5. Remaining backlog, unsequenced: real push notifications for
+   reminders (the offline-first PWA above added the service-worker
+   infrastructure that makes this more feasible than before, but actual
+   push notifications still need a Push API subscription flow + VAPID
+   keys + a backend endpoint to trigger them - not done this round,
+   just less far away now), caregiver/family mode, wearable data
+   import, emergency-flow additions beyond hospitals (e.g. showing the
+   user's own emergency contact's live ETA - same "needs something real
+   behind it" caveat as ambulance tracking above), Redis/Docker/JWT
    hardening/real role-based access control (would also let the
    `/rag-review` admin gate stop being an env-var stopgap), admin
    analytics dashboard.
@@ -405,3 +446,19 @@ preserved in git history; summarized under Section 1 above.)*
   be caught), and added an honest, UI-visible caveat (not just a code
   comment) that the rule-engine safety net itself is still English-only
   even though the AI's replies aren't.
+- 2026-07-30: Built the offline-first PWA for the SOS page. Added
+  `vite-plugin-pwa` as a devDependency - a deliberate one-off exception
+  to this project's usual "avoid new dependencies" bias, reasoned
+  through explicitly rather than defaulted into (hand-rolling correct
+  Vite build-hash precaching risks exactly the kind of stale-broken-UI
+  bug that would be worst on this specific page). Generated real app
+  icons from the existing pulse.svg brand mark rather than placeholder
+  art. The actual safety-relevant design work was deciding what NOT to
+  cache: nearby-hospitals results and all other API calls are
+  NetworkOnly, specifically so the app never shows stale hospital
+  locations as if they were current during a real emergency - only the
+  Health Passport GET gets NetworkFirst treatment, since that's what
+  the SOS critical-info card needs to render offline. Added proactive
+  offline detection (checked before attempting geolocation, not just
+  reacting to a failed request) with honest UI messaging about what
+  still works without a connection and what doesn't.
