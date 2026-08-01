@@ -8,6 +8,8 @@ export function FeatureCard({ to, icon: Icon, title, description, accent = "prim
     primary: "bg-primary-light text-primary-dark",
     danger: "bg-danger-light text-danger",
     success: "bg-success-light text-success",
+    warning: "bg-warning-light text-warning",
+    neutral: "bg-[var(--color-mist)] text-ink-soft",
   };
 
   return (

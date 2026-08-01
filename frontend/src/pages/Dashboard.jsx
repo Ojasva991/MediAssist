@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Stethoscope, BookHeart, Siren, ArrowRight, Droplet, Phone, ShieldCheck } from "lucide-react";
+import { Stethoscope, BookHeart, Siren, ArrowRight, Droplet, Phone, ShieldCheck, Clock, Bell, Pill, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FeatureCard } from "@/components/dashboard/FeatureCard";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -120,6 +120,34 @@ export default function Dashboard() {
             title="Health Passport"
             description="Your allergies, conditions, and medications — stored, editable, and ready to share."
             accent="success"
+          />
+          <FeatureCard
+            to={ROUTES.HISTORY}
+            icon={Clock}
+            title="History"
+            description="Every past analysis, with trends and severity over time."
+            accent="neutral"
+          />
+          <FeatureCard
+            to={ROUTES.REMINDERS}
+            icon={Bell}
+            title="Reminders"
+            description="Medication and follow-up reminders, one-time or recurring."
+            accent="warning"
+          />
+          <FeatureCard
+            to={ROUTES.DRUG_INTERACTIONS}
+            icon={Pill}
+            title="Drug Interactions"
+            description="Check your medications against well-known, well-documented interactions."
+            accent="warning"
+          />
+          <FeatureCard
+            to={ROUTES.CAREGIVERS}
+            icon={Users}
+            title="Caregivers & Family"
+            description="Give a trusted person read-only access, or manage reminders for someone else."
+            accent="primary"
           />
           <FeatureCard
             to={ROUTES.SOS}
