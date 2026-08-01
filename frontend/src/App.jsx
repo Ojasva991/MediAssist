@@ -14,6 +14,8 @@ import Passport from "@/pages/Passport";
 import History from "@/pages/History";
 import Reminders from "@/pages/Reminders";
 import DrugInteractions from "@/pages/DrugInteractions";
+import Caregivers from "@/pages/Caregivers";
+import CaregiverPatientView from "@/pages/CaregiverPatientView";
 import SOS from "@/pages/SOS";
 import NotFound from "@/pages/NotFound";
 
@@ -35,6 +37,8 @@ export default function App() {
               <Route path={ROUTES.HISTORY} element={<History />} />
               <Route path={ROUTES.REMINDERS} element={<Reminders />} />
               <Route path={ROUTES.DRUG_INTERACTIONS} element={<DrugInteractions />} />
+              <Route path={ROUTES.CAREGIVERS} element={<Caregivers />} />
+              <Route path={ROUTES.CAREGIVER_PATIENT} element={<CaregiverPatientView />} />
               <Route path={ROUTES.SOS} element={<SOS />} />
             </Route>
 

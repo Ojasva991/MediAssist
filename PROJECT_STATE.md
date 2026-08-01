@@ -6,7 +6,8 @@
 > back up after a gap, read only this file (not the whole codebase) before
 > deciding what to work on — it should be enough to re-orient cheaply.
 
-**Last Updated:** 2026-07-30 (offline-first PWA for SOS — see Section 6)
+**Last Updated:** 2026-07-30 (offline-first PWA for SOS + caregiver/family
+mode — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -292,6 +293,40 @@ trusted from a prior write-up.
     docstring that `navigator.onLine` means "network interface is up,"
     not "internet is actually reachable," since it isn't a guarantee).
 
+- **Caregiver/family mode (done, pushed):** scoped via clarifying
+  questions before building - separate accounts linked by an invite
+  code (not a shared login), caregiver gets read-only Passport/History
+  access plus the ability to manage reminders on the patient's behalf,
+  no edit access to the patient's Health Passport itself.
+  - Flow: `POST /caregivers/invite` (patient generates an 8-char,
+    human-typable code - excludes visually-ambiguous characters like
+    0/O, 1/I/L - expires after 7 days unused), shared out of band since
+    there's no email-sending service yet (same limitation as the
+    disposable-email/verification backlog item). `POST
+    /caregivers/accept` (caregiver, logged into their OWN account,
+    redeems it). Patient can revoke at any time
+    (`POST /caregivers/{link_id}/revoke`) - only the patient who owns
+    the link can revoke it, enforced in the store function itself, not
+    just by convention at the route layer.
+  - **The entire authorization boundary is one function**:
+    `caregiver_store.has_active_access(caregiver_user_id,
+    patient_user_id)`, called at the top of every patient-scoped route.
+    Deliberately kept to doing exactly one narrow check rather than
+    something cleverer - if this one function is ever wrong, everything
+    downstream is wrong, so it stays simple and auditable.
+  - Real bug caught by tests, not shipped: SQLite (used in tests/dev)
+    silently strips timezone info when round-tripping a
+    `DateTime(timezone=True)` column, even though it was stored as
+    timezone-aware - Postgres (production) doesn't have this problem.
+    Comparing a stored `expires_at` against `datetime.now(timezone.utc)`
+    raised `TypeError` until a normalization helper was added. Worth
+    remembering if any other code ever compares a DB-fetched datetime
+    against a freshly-generated aware one.
+  - Scope limits, explicit: no separate per-action audit log for
+    caregiver activity yet (same "keep a trail" instinct as
+    `PassportAuditLogRecord`, just not built out this round) - if this
+    matters later, it's a straightforward addition, not a redesign.
+
 ---
 
 ## 2. What's next — in priority order
@@ -326,12 +361,12 @@ trusted from a prior write-up.
    infrastructure that makes this more feasible than before, but actual
    push notifications still need a Push API subscription flow + VAPID
    keys + a backend endpoint to trigger them - not done this round,
-   just less far away now), caregiver/family mode, wearable data
-   import, emergency-flow additions beyond hospitals (e.g. showing the
-   user's own emergency contact's live ETA - same "needs something real
-   behind it" caveat as ambulance tracking above), Redis/Docker/JWT
-   hardening/real role-based access control (would also let the
-   `/rag-review` admin gate stop being an env-var stopgap), admin
+   just less far away now), wearable data import, emergency-flow
+   additions beyond hospitals (e.g. showing the user's own emergency
+   contact's live ETA - same "needs something real behind it" caveat as
+   ambulance tracking above), Redis/Docker/JWT hardening/real
+   role-based access control (would also let the `/rag-review` admin
+   gate stop being an env-var stopgap), admin
    analytics dashboard.
 
 ## 3. Key gotchas (don't relearn these the hard way)
@@ -462,3 +497,14 @@ preserved in git history; summarized under Section 1 above.)*
   offline detection (checked before attempting geolocation, not just
   reacting to a failed request) with honest UI messaging about what
   still works without a connection and what doesn't.
+- 2026-07-30 (continued): Built caregiver/family mode. Scoped it
+  deliberately via clarifying questions first, given the privacy/
+  security stakes of one person accessing another's health data:
+  separate accounts linked by an invite code (not shared logins),
+  read-only Passport/History access plus reminder management, no
+  Passport edit access. Kept the authorization check to one single,
+  narrow, auditable function
+  (`caregiver_store.has_active_access()`) that every patient-scoped
+  route calls first, on purpose - simple enough to trust. Caught a
+  real SQLite-vs-Postgres timezone bug via tests (naive/aware datetime
+  comparison) before it could reach anywhere near production.

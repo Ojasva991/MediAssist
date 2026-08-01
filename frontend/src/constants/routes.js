@@ -9,5 +9,7 @@ export const ROUTES = {
   HISTORY: "/history",
   REMINDERS: "/reminders",
   DRUG_INTERACTIONS: "/drug-interactions",
+  CAREGIVERS: "/caregivers",
+  CAREGIVER_PATIENT: "/caregivers/patient/:patientId",
   SOS: "/sos",
 };

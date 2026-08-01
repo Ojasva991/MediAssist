@@ -16,7 +16,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
 from app.rate_limit import limiter
-from app.routes import analyze, auth, documents, drug_interactions, emergency, history, passport, rag_review, reminders
+from app.routes import analyze, auth, caregivers, documents, drug_interactions, emergency, history, passport, rag_review, reminders
 from app.storage.db import Base, engine
 from app.storage import models  # noqa: F401 - import registers the tables with Base
 
@@ -235,3 +235,4 @@ app.include_router(rag_review.router)
 app.include_router(emergency.router)
 app.include_router(reminders.router)
 app.include_router(drug_interactions.router)
+app.include_router(caregivers.router)

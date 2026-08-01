@@ -74,3 +74,20 @@ def get_user_by_email(email: str) -> Optional[dict]:
         }
     finally:
         session.close()
+
+
+def get_user_by_id(user_id: str) -> Optional[dict]:
+    """
+    Return {user_id, name, email} (no password_hash - callers of this
+    one are display-purpose lookups, e.g. showing a linked caregiver's
+    or patient's name in app/routes/caregivers.py, never auth checks)
+    or None if not found.
+    """
+    session = get_session()
+    try:
+        record = session.query(UserRecord).filter(UserRecord.user_id == user_id).first()
+        if record is None:
+            return None
+        return {"user_id": record.user_id, "name": record.name, "email": record.email}
+    finally:
+        session.close()

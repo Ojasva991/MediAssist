@@ -231,3 +231,47 @@ class ReminderRecord(Base):
     repeat_every_days = Column(Integer, nullable=True)  # None = one-time
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CaregiverLinkRecord(Base):
+    """
+    Links a caregiver's account to a patient's account, granting the
+    caregiver read-only access to the patient's Health Passport/History
+    and the ability to manage the patient's reminders (see
+    app/routes/caregivers.py for exactly which endpoints check this).
+
+    Deliberately two SEPARATE accounts linked by consent, not a shared
+    login - the patient generates a short invite code
+    (app/storage/caregiver_store.py's create_invite) and shares it with
+    the caregiver out of band (there's no email-sending service in this
+    project yet - see PROJECT_STATE.md's Brevo/Resend research - so this
+    is a manually-shared code, not an emailed link). The caregiver,
+    logged into their OWN account, redeems the code once.
+
+    status transitions: pending -> active (on accept) -> revoked (only
+    the patient can revoke, at any time). A revoked link is kept, not
+    deleted, as a record that access existed and was later removed -
+    same "keep a trail" instinct as PassportAuditLogRecord elsewhere in
+    this file, just without a separate per-action log table for this
+    first version (a real scope limit, not an oversight - see
+    PROJECT_STATE.md).
+
+    Brand-new table - no manual migration needed.
+    """
+
+    __tablename__ = "caregiver_links"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_user_id = Column(String(24), nullable=False, index=True)
+    # Null until a caregiver actually redeems the invite code.
+    caregiver_user_id = Column(String(24), nullable=True, index=True)
+    invite_code = Column(String(12), nullable=False, unique=True, index=True)
+    status = Column(String(20), nullable=False, default="pending", index=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # Unredeemed invite codes expire - see app/storage/caregiver_store.py.
+    # Already-accepted links never expire on their own; they last until
+    # the patient explicitly revokes them.
+    expires_at = Column(DateTime(timezone=True), nullable=False)
