@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Stethoscope, BookHeart, Clock, Bell, Pill, Users, Siren, LogOut } from "lucide-react";
+import { LayoutGrid, Stethoscope, BookHeart, Clock, Bell, Pill, Users, Siren, ShieldCheck, LogOut } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,25 @@ const NAV_ITEMS = [
   { label: "SOS", to: ROUTES.SOS, icon: Siren, danger: true },
 ];
 
+// UI convenience only - NOT a security boundary. The real gate is the
+// backend's ADMIN_USER_IDS check on GET /admin/analytics
+// (app/auth/admin.py). Someone not in this list who navigates to
+// /admin/analytics directly still gets a clean 403 from the backend;
+// this only controls whether the sidebar link is shown.
+const ADMIN_USER_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
 export function Sidebar({ className, onNavigate }) {
   const { user, logout } = useAuth();
+  const isAdmin = user?.userId && ADMIN_USER_IDS.includes(user.userId);
+  const navItems = isAdmin
+    ? [
+        ...NAV_ITEMS,
+        { label: "Admin Analytics", to: ROUTES.ADMIN_ANALYTICS, icon: ShieldCheck },
+      ]
+    : NAV_ITEMS;
 
   return (
     <aside
@@ -42,7 +59,7 @@ export function Sidebar({ className, onNavigate }) {
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {NAV_ITEMS.map(({ label, to, icon: Icon, danger }) => (
+        {navItems.map(({ label, to, icon: Icon, danger }) => (
           <NavLink
             key={to}
             to={to}
