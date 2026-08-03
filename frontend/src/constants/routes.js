@@ -11,5 +11,6 @@ export const ROUTES = {
   DRUG_INTERACTIONS: "/drug-interactions",
   CAREGIVERS: "/caregivers",
   CAREGIVER_PATIENT: "/caregivers/patient/:patientId",
+  ADMIN_ANALYTICS: "/admin/analytics",
   SOS: "/sos",
 };

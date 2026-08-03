@@ -17,6 +17,14 @@ class UserRecord(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
+    # Added for the admin analytics dashboard's signup-over-time chart
+    # (app/routes/admin_analytics.py). Nullable because existing rows
+    # predate this column and won't have a value - see PROJECT_STATE.md's
+    # gotcha about needing a manual ALTER TABLE against production for
+    # new columns on an existing table (same situation as `gender` on
+    # `passports` earlier). Older users simply won't appear in the
+    # signups_by_day breakdown; they're still counted in total_users.
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
 
 
 class PassportRecord(Base):
@@ -275,3 +283,38 @@ class CaregiverLinkRecord(Base):
     # Already-accepted links never expire on their own; they last until
     # the patient explicitly revokes them.
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class AIProviderUsageRecord(Base):
+    """
+    One row per AI-gateway attempt (see app/ai/gateway.py) - the real,
+    queryable data behind the admin analytics dashboard's "provider
+    usage" and "fallback frequency" numbers
+    (app/routes/admin_analytics.py). Without this table those numbers
+    would have to be fabricated or omitted; this makes them real.
+
+    `provider` is "gemini", "groq", or "all_failed" (logged once, right
+    where app/ai/gateway.py raises AIGatewayError - i.e. every request
+    that fell all the way through to the rule-engine-only fallback in
+    app/ai/triage_service.py).
+
+    Logging a row here is best-effort and must NEVER be able to break
+    an actual analysis request - see app/storage/ai_usage_store.py's
+    log_attempt(), which swallows its own failures.
+
+    Scope note: only covers the TEXT /analyze and /analyze/follow-up
+    paths, which go through the gateway. POST /analyze/image calls
+    Gemini directly (see PROJECT_STATE.md for why) and is NOT counted
+    here - the analytics dashboard says so explicitly rather than
+    silently under-counting.
+
+    Brand-new table - no manual migration needed.
+    """
+
+    __tablename__ = "ai_provider_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String(20), nullable=False, index=True)  # "gemini" | "groq" | "all_failed"
+    success = Column(Boolean, nullable=False)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

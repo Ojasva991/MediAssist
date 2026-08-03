@@ -39,10 +39,12 @@ below, once/if those decisions are actually made.
 """
 
 import logging
+import time
 
 from app.ai.gemini_client import gemini_client, GeminiClientError
 from app.ai.groq_client import groq_client, GroqClientError
 from app.config import settings
+from app.storage.ai_usage_store import log_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -59,26 +61,41 @@ def generate(system_prompt: str, user_prompt: str) -> str:
     Try each available provider in priority order, returning the first
     success. Raises AIGatewayError only if every configured provider
     failed (or none are configured beyond Gemini, and Gemini failed).
+
+    Every attempt is logged via log_attempt() for the admin analytics
+    dashboard (app/routes/admin_analytics.py) - this is the ONLY place
+    that happens, so provider-usage numbers there are real, not
+    fabricated. Logging is best-effort (see
+    app/storage/ai_usage_store.py's docstring) and can never affect
+    this function's actual return value or timing-sensitive behavior.
     """
     errors: list[str] = []
 
+    start = time.monotonic()
     try:
-        return gemini_client.generate(system_prompt, user_prompt)
+        result = gemini_client.generate(system_prompt, user_prompt)
+        log_attempt("gemini", True, int((time.monotonic() - start) * 1000))
+        return result
     except GeminiClientError as e:
+        log_attempt("gemini", False, int((time.monotonic() - start) * 1000))
         logger.warning("AI gateway: Gemini failed, trying next provider: %s", e)
         errors.append(f"Gemini: {e}")
 
     if settings.GROQ_API_KEY:
+        start = time.monotonic()
         try:
             result = groq_client.generate(system_prompt, user_prompt)
+            log_attempt("groq", True, int((time.monotonic() - start) * 1000))
             logger.info("AI gateway: Gemini failed but Groq succeeded as fallback")
             return result
         except GroqClientError as e:
+            log_attempt("groq", False, int((time.monotonic() - start) * 1000))
             logger.warning("AI gateway: Groq also failed: %s", e)
             errors.append(f"Groq: {e}")
     else:
         logger.debug("AI gateway: GROQ_API_KEY not configured, skipping Groq")
 
+    log_attempt("all_failed", False, None)
     raise AIGatewayError(
         "All configured AI providers failed: " + ("; ".join(errors) if errors else "none configured")
     )

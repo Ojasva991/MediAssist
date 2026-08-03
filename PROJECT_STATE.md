@@ -6,8 +6,7 @@
 > back up after a gap, read only this file (not the whole codebase) before
 > deciding what to work on — it should be enough to re-orient cheaply.
 
-**Last Updated:** 2026-07-30 (offline-first PWA for SOS + caregiver/family
-mode — see Section 6)
+**Last Updated:** 2026-08-01 (admin analytics dashboard — see Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -327,6 +326,45 @@ trusted from a prior write-up.
     `PassportAuditLogRecord`, just not built out this round) - if this
     matters later, it's a straightforward addition, not a redesign.
 
+- **Admin analytics dashboard (done, pushed) - every number is a real
+  query, nothing estimated or fabricated:** `GET /admin/analytics`,
+  admin-gated (see below), plus a matching (not sidebar-linked, direct-
+  URL-only) frontend page at `/admin/analytics` - same "not advertised
+  to regular users" treatment as `/rag-review`.
+  - **Refactored the admin gate to one shared place first**:
+    `app/auth/admin.py`'s `require_admin` - it was duplicated inline in
+    `rag_review.py` before this. Two independent copies of "check if
+    admin" is exactly the kind of thing that quietly drifts when one
+    gets updated and the other doesn't; now there's one function both
+    `/rag-review` and `/admin/analytics` depend on.
+  - **Two real data gaps were found and fixed properly instead of
+    faked while building this - worth remembering:**
+    1. `llm_severity` (the AI's own severity read, before rule-engine
+       reconciliation) is never persisted to `AnalysisHistoryRecord` -
+       only exists transiently in the API response. A "how often did
+       the rule engine override the AI" metric was planned, then
+       removed from the response model entirely once this was
+       noticed, rather than shipped as a fake/always-zero number.
+    2. `UserRecord` had **no `created_at` column at all** - added one
+       (nullable, existing rows will be NULL) rather than reporting a
+       fabricated signup timeline. Same "new column on an existing
+       table needs a manual `ALTER TABLE` against production" gotcha
+       as the `gender` column on `passports` earlier - **this one
+       needs that manual migration step run in production too.**
+  - **New table**: `AIProviderUsageRecord` - one row per Gemini/Groq
+    attempt inside `app/ai/gateway.py`, plus one `all_failed` row
+    whenever both fail and the request falls through to the rule-
+    engine-only response. This is the real, queryable data behind the
+    dashboard's provider-usage and fallback-frequency numbers.
+    Logging is best-effort (`app/storage/ai_usage_store.py`) and
+    deliberately can never break an actual analysis request even if
+    the logging write itself fails.
+  - **Explicit scope note surfaced in the API response itself** (not
+    just a code comment): provider-usage stats cover `/analyze` and
+    `/analyze/follow-up` only, since those go through the gateway;
+    `/analyze/image` calls Gemini directly and isn't counted - the
+    dashboard says so rather than silently under-counting.
+
 ---
 
 ## 2. What's next — in priority order
@@ -365,9 +403,9 @@ trusted from a prior write-up.
    additions beyond hospitals (e.g. showing the user's own emergency
    contact's live ETA - same "needs something real behind it" caveat as
    ambulance tracking above), Redis/Docker/JWT hardening/real
-   role-based access control (would also let the `/rag-review` admin
-   gate stop being an env-var stopgap), admin
-   analytics dashboard.
+   role-based access control (would also let the `/rag-review` AND
+   `/admin/analytics` admin gate - now shared, see Section 1 - stop
+   being an env-var stopgap).
 
 ## 3. Key gotchas (don't relearn these the hard way)
 
@@ -383,6 +421,14 @@ trusted from a prior write-up.
 - New TABLES need no manual migration (`create_all()` handles it). New
   COLUMNS on an EXISTING table DO need a manual `ALTER TABLE` - still no
   Alembic/migration tool in this project.
+- **⚠️ PENDING MANUAL MIGRATION (2026-08-01):** `users.created_at` was
+  added for the admin analytics dashboard's signup-over-time chart.
+  `create_all()` won't add this column to the existing production
+  `users` table - run this manually against production before the
+  signups-by-day numbers there will mean anything for existing users:
+  `ALTER TABLE users ADD COLUMN created_at TIMESTAMPTZ;` (nullable is
+  fine/expected - existing rows stay NULL, new signups get it
+  automatically going forward via the column's `server_default`).
 - **Render has no outbound IPv6 route.** Any future code making an
   external HTTP call from the backend should be aware `urlopen`/`requests`
   can fail with `Errno 101 Network is unreachable` if DNS returns an IPv6
@@ -508,3 +554,16 @@ preserved in git history; summarized under Section 1 above.)*
   route calls first, on purpose - simple enough to trust. Caught a
   real SQLite-vs-Postgres timezone bug via tests (naive/aware datetime
   comparison) before it could reach anywhere near production.
+- 2026-08-01: Also updated the Dashboard's feature grid to show all 7
+  features instead of only 3 (History, Reminders, Drug Interactions,
+  and Caregivers had no card/link on the dashboard despite having full
+  pages). Then built the admin analytics dashboard. Refactored the
+  duplicated inline admin-gate check into one shared
+  `app/auth/admin.py` first, since two independent copies of the same
+  privilege check is a real bug risk, not just untidy. While wiring up
+  real metrics, found and fixed two genuine data gaps rather than
+  faking numbers to fill them: `llm_severity` isn't persisted anywhere
+  (dropped that planned metric instead of shipping a fake one), and
+  `UserRecord` had no `created_at` column at all (added one - this
+  needs a manual `ALTER TABLE` on production, flagged prominently in
+  Section 3, not just mentioned in passing).

@@ -24,8 +24,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import get_current_user_id
-from app.config import settings
+from app.auth.admin import require_admin
 from app.storage.staged_guidance_store import (
     get_staged_document,
     list_staged_documents,
@@ -35,18 +34,6 @@ from app.storage.staged_guidance_store import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rag-review", tags=["Guidance Review (admin)"])
-
-
-def _require_admin(current_user_id: str = Depends(get_current_user_id)) -> str:
-    if current_user_id not in settings.ADMIN_USER_IDS:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Not authorized to review staged guidance documents. "
-                "This is an admin-only area."
-            ),
-        )
-    return current_user_id
 
 
 class StagedDocumentOut(BaseModel):
@@ -84,7 +71,7 @@ def list_pending(
         alias="status",
         description="pending_review | approved | rejected | all",
     ),
-    _admin_user_id: str = Depends(_require_admin),
+    _admin_user_id: str = Depends(require_admin),
 ) -> list[StagedDocumentOut]:
     query_status = None if status_filter == "all" else status_filter
     return list_staged_documents(status=query_status)
@@ -94,7 +81,7 @@ def list_pending(
 def submit_decision(
     document_id: int,
     payload: ReviewDecisionRequest,
-    admin_user_id: str = Depends(_require_admin),
+    admin_user_id: str = Depends(require_admin),
 ) -> StagedDocumentOut:
     existing = get_staged_document(document_id)
     if existing is None:

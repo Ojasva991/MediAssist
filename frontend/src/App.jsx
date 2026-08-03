@@ -16,6 +16,7 @@ import Reminders from "@/pages/Reminders";
 import DrugInteractions from "@/pages/DrugInteractions";
 import Caregivers from "@/pages/Caregivers";
 import CaregiverPatientView from "@/pages/CaregiverPatientView";
+import AdminAnalytics from "@/pages/AdminAnalytics";
 import SOS from "@/pages/SOS";
 import NotFound from "@/pages/NotFound";
 
@@ -39,6 +40,7 @@ export default function App() {
               <Route path={ROUTES.DRUG_INTERACTIONS} element={<DrugInteractions />} />
               <Route path={ROUTES.CAREGIVERS} element={<Caregivers />} />
               <Route path={ROUTES.CAREGIVER_PATIENT} element={<CaregiverPatientView />} />
+              <Route path={ROUTES.ADMIN_ANALYTICS} element={<AdminAnalytics />} />
               <Route path={ROUTES.SOS} element={<SOS />} />
             </Route>
 
