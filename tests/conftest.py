@@ -32,7 +32,21 @@ from app.storage.db import Base, engine
 
 @pytest.fixture(scope="session", autouse=True)
 def _test_database():
-    """Create all tables once per test session, drop + delete the file after."""
+    """
+    Create all tables once per test session, drop + delete the file
+    after.
+
+    Also deletes any STALE file at the START, defensively - the
+    end-of-session cleanup below only runs if the previous pytest
+    invocation exited normally. If it was interrupted (Ctrl+C, a crash,
+    closing the terminal mid-run), that cleanup never happens, and the
+    leftover file accumulates real rows across every run since. A test
+    asserting "my newly created user appears in a fresh, small dataset"
+    can then fail for reasons that have nothing to do with the code
+    under test - this happened for real, not hypothetically.
+    """
+    if _TEST_DB_PATH.exists():
+        _TEST_DB_PATH.unlink()
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
