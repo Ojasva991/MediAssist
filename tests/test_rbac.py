@@ -1,5 +1,5 @@
 from app.config import settings
-from app.storage.user_store import get_role, get_user_by_id, set_role
+from app.storage.user_store import get_role, set_role
 
 
 def test_new_signup_defaults_to_user_role(client):

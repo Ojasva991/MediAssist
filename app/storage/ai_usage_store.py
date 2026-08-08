@@ -3,7 +3,7 @@ Storage helpers for AIProviderUsageRecord (see app/storage/models.py).
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from app.storage.db import get_session
 from app.storage.models import AIProviderUsageRecord
