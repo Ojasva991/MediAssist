@@ -25,6 +25,15 @@ class UserRecord(Base):
     # `passports` earlier). Older users simply won't appear in the
     # signups_by_day breakdown; they're still counted in total_users.
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    # Real role-based access control, replacing the ADMIN_USER_IDS
+    # env-var stopgap (see app/auth/admin.py). "user" | "admin" for now -
+    # a single flat role is proportionate to this project's actual
+    # current needs (two admin-only routes), not a sign this can't grow
+    # into a real permissions table later if it needs to. Another new
+    # column on an existing table - needs the same manual ALTER TABLE
+    # treatment as `created_at` above before this means anything on
+    # existing rows in production.
+    role = Column(String(20), nullable=False, server_default="user")
 
 
 class PassportRecord(Base):

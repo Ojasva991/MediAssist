@@ -15,11 +15,15 @@ const NAV_ITEMS = [
   { label: "SOS", to: ROUTES.SOS, icon: Siren, danger: true },
 ];
 
-// UI convenience only - NOT a security boundary. The real gate is the
-// backend's ADMIN_USER_IDS check on GET /admin/analytics
-// (app/auth/admin.py). Someone not in this list who navigates to
-// /admin/analytics directly still gets a clean 403 from the backend;
-// this only controls whether the sidebar link is shown.
+// UI convenience only - NOT the security boundary either way. The real
+// gate is the backend's require_admin (app/auth/admin.py), which checks
+// the database role. Two conditions here, both transitional-safe:
+// - user.role === "admin": the real, current mechanism (set via
+//   app/scripts/grant_admin.py or POST /admin/users/{id}/role).
+// - VITE_ADMIN_USER_IDS: kept only so someone already logged in from
+//   before this change (whose stored session predates the `role`
+//   field) doesn't lose the link until they next log in. Safe to
+//   remove once that's no longer a concern.
 const ADMIN_USER_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || "")
   .split(",")
   .map((id) => id.trim())
@@ -27,7 +31,7 @@ const ADMIN_USER_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || "")
 
 export function Sidebar({ className, onNavigate }) {
   const { user, logout } = useAuth();
-  const isAdmin = user?.userId && ADMIN_USER_IDS.includes(user.userId);
+  const isAdmin = user?.role === "admin" || (user?.userId && ADMIN_USER_IDS.includes(user.userId));
   const navItems = isAdmin
     ? [
         ...NAV_ITEMS,

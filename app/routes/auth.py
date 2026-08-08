@@ -37,6 +37,7 @@ def signup(payload: UserSignup) -> TokenResponse:
         user_id=user["user_id"],
         name=user["name"],
         email=user["email"],
+        role=user["role"],
     )
 
 
@@ -58,4 +59,5 @@ def login(payload: UserLogin) -> TokenResponse:
         user_id=user["user_id"],
         name=user["name"],
         email=user["email"],
+        role=user["role"],
     )

@@ -6,7 +6,8 @@
 > back up after a gap, read only this file (not the whole codebase) before
 > deciding what to work on — it should be enough to re-orient cheaply.
 
-**Last Updated:** 2026-08-01 (admin analytics dashboard — see Section 6)
+**Last Updated:** 2026-08-04 (real role-based access control — see
+Section 6)
 **Repo:** https://github.com/Ojasva991/MediAssist (owner: Ojasva991) — repo
 name itself is still "MediAssist" on GitHub; only the product/app inside it
 is Vaeda. Renaming the repo itself still hasn't been done.
@@ -365,6 +366,43 @@ trusted from a prior write-up.
     `/analyze/image` calls Gemini directly and isn't counted - the
     dashboard says so rather than silently under-counting.
 
+- **Real role-based access control (done, pushed) - replaces the
+  `ADMIN_USER_IDS` env-var stopgap that both `/rag-review` and
+  `/admin/analytics` had been using since they were built:**
+  - `UserRecord.role` (`"user"` | `"admin"`, defaults to `"user"` on
+    every signup) is now the primary admin mechanism. Another new
+    column on an existing table - **needs a manual production
+    migration, see Section 3's pending-migration entry, same pattern
+    as `users.created_at` before it.**
+  - **`app/auth/admin.py`'s `require_admin` checks the real role
+    first, with `ADMIN_USER_IDS` kept as a deliberate, TEMPORARY OR
+    fallback** - not removed outright - specifically so nobody who
+    already had access via the env var loses it the instant this
+    deploys, before their account has been migrated to a real role.
+    Once the current env-var admin(s) are migrated (see below), that
+    fallback should be deleted - it must not become a permanent second
+    admin system living alongside the real one.
+  - **Bootstrapping the first admin**: `python -m app.scripts.grant_admin
+    <email>` (and `--revoke` to demote) - a deliberate manual/shell
+    step, not an API endpoint, because an unauthenticated "become
+    admin" API path would be a real vulnerability. This is the
+    chicken-and-egg solution: once at least one real admin exists,
+    further promotions can happen self-service through the app via the
+    next item.
+  - **New self-service admin routes**: `GET /admin/users` (list, no
+    password hashes ever returned) and `POST
+    /admin/users/{user_id}/role` (promote/demote) - both admin-gated.
+    An admin is blocked from demoting their own account through this
+    endpoint specifically (a lockout footgun that's cheap to prevent
+    outright rather than just document).
+  - Frontend: `AuthContext` now stores `role` from the real login/
+    signup response; the Sidebar's admin-link visibility checks
+    `user.role === "admin"` first, with the old `VITE_ADMIN_USER_IDS`
+    kept as the same kind of transitional OR fallback (covers anyone
+    already logged in from before this change, whose stored session
+    predates the `role` field, until they next log in) - still just a
+    UI convenience either way, never the actual security boundary.
+
 ---
 
 ## 2. What's next — in priority order
@@ -394,18 +432,21 @@ trusted from a prior write-up.
 4. **SMS reminders** - same kind of decision as above but for SMS (a
    provider like Twilio, with a phone number and real per-message cost).
    Explicitly deferred, not started, not decided on.
-5. Remaining backlog, unsequenced: real push notifications for
-   reminders (the offline-first PWA above added the service-worker
-   infrastructure that makes this more feasible than before, but actual
-   push notifications still need a Push API subscription flow + VAPID
-   keys + a backend endpoint to trigger them - not done this round,
-   just less far away now), wearable data import, emergency-flow
-   additions beyond hospitals (e.g. showing the user's own emergency
-   contact's live ETA - same "needs something real behind it" caveat as
-   ambulance tracking above), Redis/Docker/JWT hardening/real
-   role-based access control (would also let the `/rag-review` AND
-   `/admin/analytics` admin gate - now shared, see Section 1 - stop
-   being an env-var stopgap).
+5. Remaining backlog, unsequenced: **migrate the current env-var
+   admin(s) to real roles and then delete the `ADMIN_USER_IDS`
+   fallback from `app/auth/admin.py`** (run `python -m
+   app.scripts.grant_admin <email>` for each, confirm they still have
+   access, then remove the transitional OR-check - see Section 1's RBAC
+   entry) - the fallback should not become permanent. Redis/Docker
+   (session storage, containerization) - not started, no urgency
+   identified yet. Real push notifications for reminders (the offline-
+   first PWA above added the service-worker infrastructure that makes
+   this more feasible than before, but actual push notifications still
+   need a Push API subscription flow + VAPID keys + a backend endpoint
+   to trigger them - not done this round, just less far away now),
+   wearable data import, emergency-flow additions beyond hospitals (e.g.
+   showing the user's own emergency contact's live ETA - same "needs
+   something real behind it" caveat as ambulance tracking above).
 
 ## 3. Key gotchas (don't relearn these the hard way)
 
@@ -429,6 +470,14 @@ trusted from a prior write-up.
   `ALTER TABLE users ADD COLUMN created_at TIMESTAMPTZ;` (nullable is
   fine/expected - existing rows stay NULL, new signups get it
   automatically going forward via the column's `server_default`).
+- **⚠️ PENDING MANUAL MIGRATION (2026-08-04):** `users.role` was added
+  for real RBAC (see Section 1). Run this against production too, in
+  the same batch as the `created_at` one above if it hasn't happened
+  yet: `ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT
+  'user';` - existing users all become role="user" (correct, safe
+  default), then run `python -m app.scripts.grant_admin <email>` for
+  whichever account(s) were previously admin via the `ADMIN_USER_IDS`
+  env var, to actually give them the real role.
 - **Render has no outbound IPv6 route.** Any future code making an
   external HTTP call from the backend should be aware `urlopen`/`requests`
   can fail with `Errno 101 Network is unreachable` if DNS returns an IPv6
@@ -567,3 +616,20 @@ preserved in git history; summarized under Section 1 above.)*
   `UserRecord` had no `created_at` column at all (added one - this
   needs a manual `ALTER TABLE` on production, flagged prominently in
   Section 3, not just mentioned in passing).
+- 2026-08-04: Also helped debug why an admin-only sidebar link wasn't
+  showing up for a specific account - turned out the frontend code
+  change had never actually been pushed (env vars were set correctly
+  on both Render and Vercel, redeploys were triggered, but redeploying
+  the same old commit doesn't pick up code that was never committed -
+  `git status`/`git log origin/main` caught it). Then built real
+  role-based access control to replace the `ADMIN_USER_IDS` env-var
+  stopgap: `users.role` column (needs a manual production migration,
+  see Section 3), `require_admin` now checks the real role first with
+  the env var kept as a deliberate temporary fallback so nobody loses
+  access mid-migration, a CLI bootstrap script for the first admin
+  (`app/scripts/grant_admin.py` - deliberately not an API endpoint,
+  since an unauthenticated "become admin" path would be a real
+  vulnerability), and self-service `GET/POST /admin/users` routes for
+  every promotion after the first. Frontend now stores and checks the
+  real `role` from login/signup, same transitional-fallback treatment
+  as the backend.

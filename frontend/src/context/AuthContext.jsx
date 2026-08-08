@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
       userId: result.user_id,
       name: result.name,
       email: result.email,
+      role: result.role,
       accessToken: result.access_token,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
