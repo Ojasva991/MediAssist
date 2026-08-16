@@ -1,0 +1,42 @@
+name: Keep Supabase Alive
+
+# Supabase pauses Free Plan projects after 7 days with no database activity.
+# This workflow sends a lightweight, read-only request twice a week so the
+# project never crosses that threshold. It does not touch or expose any
+# real user data — it only confirms the API responds.
+#
+# Required repo secret:
+#   SUPABASE_ANON_KEY - the anon/public API key from
+#   Supabase Dashboard -> Project Settings -> API
+
+on:
+  schedule:
+    # Runs Sunday and Wednesday at 00:00 UTC - comfortably under the
+    # 7-day inactivity window even if one run is delayed or skipped.
+    - cron: "0 0 * * 0,3"
+  workflow_dispatch: {} # allows manually triggering a run from the Actions tab
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        run: |
+          SUPABASE_PROJECT_REF="lxfqhhqhwpwtsxipqtyb"
+          HTTP_STATUS=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "https://${SUPABASE_PROJECT_REF}.supabase.co/rest/v1/users?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+
+          echo "Response status: $HTTP_STATUS"
+          cat /tmp/response.txt
+
+          # Any response (200, or even 401/403 from RLS) means Supabase
+          # received and processed a request - that's what resets the
+          # inactivity timer. Only fail the job on a network-level miss.
+          if [ "$HTTP_STATUS" -ge 500 ] || [ "$HTTP_STATUS" -eq 000 ]; then
+            echo "::error::No response from Supabase - check project ref/status"
+            exit 1
+          fi
+
+          echo "Keep-alive ping sent successfully."
