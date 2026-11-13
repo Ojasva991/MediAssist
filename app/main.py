@@ -14,6 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from app.ai.gateway import configured_providers
 from app.config import settings
 from app.rate_limit import limiter
 from app.routes import admin_analytics, admin_users, analyze, auth, caregivers, documents, drug_interactions, emergency, history, passport, rag_review, reminders
@@ -146,8 +147,17 @@ def create_tables() -> None:
     Sheets - runs once per process start, safe to call every time
     since it's a no-op if the tables already exist.
     """
+    settings.validate()
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables verified/created.")
+    providers = configured_providers()
+    if providers:
+        logger.info("AI providers configured (in order): %s", ", ".join(providers))
+    else:
+        logger.warning(
+            "No AI provider configured - every analysis will use the "
+            "rule-engine-only fallback. Set at least one key (see .env.example)."
+        )
 
 
 # ---------------------------------------------------------------------
@@ -218,7 +228,8 @@ def health_check():
         "service": settings.APP_NAME,
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT,
-        "ai_service": "online",
+        "ai_service": "online" if configured_providers() else "rule-engine-only",
+        "ai_providers_configured": len(configured_providers()),
     }
 
 

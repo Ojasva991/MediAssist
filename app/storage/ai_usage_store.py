@@ -57,13 +57,20 @@ def get_provider_stats(since: datetime) -> dict:
         "gemini": {"success": 0, "failure": 0},
         "groq": {"success": 0, "failure": 0},
         "all_failed": 0,
+        "other": {"success": 0, "failure": 0},  # every other provider
+        "by_provider": {},
     }
     for row in rows:
+        key = "success" if row.success else "failure"
         if row.provider == "all_failed":
             stats["all_failed"] += 1
-        elif row.provider in stats:
-            key = "success" if row.success else "failure"
+            continue
+        bucket = stats["by_provider"].setdefault(row.provider, {"success": 0, "failure": 0})
+        bucket[key] += 1
+        if row.provider in ("gemini", "groq"):
             stats[row.provider][key] += 1
+        else:
+            stats["other"][key] += 1
     return stats
 
 

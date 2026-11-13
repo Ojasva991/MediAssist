@@ -1,0 +1,6 @@
+{
+  "appId": "com.vaeda.app",
+  "appName": "Vaeda",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}

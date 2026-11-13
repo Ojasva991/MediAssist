@@ -17,8 +17,12 @@ import re
 from pydantic import ValidationError
 
 from app.ai.fallback import build_fallback_response
-from app.ai.gemini_client import gemini_client, GeminiClientError
-from app.ai.gateway import generate as ai_gateway_generate, AIGatewayError
+from app.ai.gemini_client import gemini_client, GeminiClientError  # noqa: F401 - kept importable here for tests that patch it
+from app.ai.gateway import (
+    AIGatewayError,
+    generate as ai_gateway_generate,
+    generate_with_image as ai_gateway_generate_with_image,
+)
 from app.ai.prompts import (
     IMAGE_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
@@ -269,11 +273,11 @@ def analyze_image(
     )
 
     try:
-        raw_text = gemini_client.generate_with_image(
+        raw_text = ai_gateway_generate_with_image(
             IMAGE_SYSTEM_PROMPT, user_prompt, image_bytes, mime_type
         )
-    except GeminiClientError as e:
-        logger.error("Gemini image call failed, using fallback: %s", e)
+    except AIGatewayError as e:
+        logger.error("All AI providers failed for image analysis, using fallback: %s", e)
         return build_fallback_response(rule_engine_request)
 
     try:
