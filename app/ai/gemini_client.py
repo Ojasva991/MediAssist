@@ -43,11 +43,24 @@ class GeminiClientError(Exception):
 
 class GeminiClient:
     def __init__(self) -> None:
-        self._client = genai.Client(
-            api_key=settings.GEMINI_API_KEY,
-            http_options=types.HttpOptions(retry_options=_RETRY_OPTIONS),
-        )
-        self._model = settings.GEMINI_MODEL
+        # Created lazily: Gemini is now an OPTIONAL provider, so importing
+        # this module must not fail (or build a client) when no key is set.
+        self.__client = None
+
+    @property
+    def _client(self):
+        if self.__client is None:
+            if not settings.GEMINI_API_KEY:
+                raise GeminiClientError("GEMINI_API_KEY is not configured")
+            self.__client = genai.Client(
+                api_key=settings.GEMINI_API_KEY,
+                http_options=types.HttpOptions(retry_options=_RETRY_OPTIONS),
+            )
+        return self.__client
+
+    @property
+    def _model(self) -> str:
+        return settings.GEMINI_MODEL
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """

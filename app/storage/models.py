@@ -323,7 +323,7 @@ class AIProviderUsageRecord(Base):
     __tablename__ = "ai_provider_usage"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    provider = Column(String(20), nullable=False, index=True)  # "gemini" | "groq" | "all_failed"
+    provider = Column(String(20), nullable=False, index=True)  # any provider name | "all_failed"
     success = Column(Boolean, nullable=False)
     latency_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

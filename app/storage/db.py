@@ -15,7 +15,19 @@ from app.config import settings
 # pool_pre_ping avoids "server closed the connection unexpectedly" errors
 # after the free-tier DB has been idle for a while (same class of problem
 # as Render's cold starts).
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict = {"pool_pre_ping": True}
+if not _is_sqlite:
+    # Neon (serverless Postgres) suspends compute after ~5 min idle and
+    # closes idle connections; pre_ping + recycle handles reconnects, and a
+    # small pool keeps us far below the free tier's connection limits.
+    _engine_kwargs.update(
+        pool_size=3,
+        max_overflow=2,
+        pool_recycle=240,
+        connect_args={"connect_timeout": 15},
+    )
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
